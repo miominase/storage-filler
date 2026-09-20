@@ -21,8 +21,8 @@ android {
         applicationId = "jp.own.storagefiller"
         minSdk = 24
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.7.0"
+        versionCode = 9
+        versionName = "0.7.1"
 
         // アプリ内アップデートの取得元。リポジトリを移す場合はここだけ変える
         buildConfigField("String", "UPDATE_REPO", "\"miominase/storage-filler\"")

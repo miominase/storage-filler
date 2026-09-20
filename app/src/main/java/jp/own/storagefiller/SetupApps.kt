@@ -16,6 +16,7 @@ object SetupApps {
         Entry("Chrome", "com.android.chrome"),
         Entry("Google レンズ", "com.google.ar.lens"),
         Entry("Google Play開発者サービス", "com.google.android.gms"),
+        Entry("Carrier Services", "com.google.android.ims"),
         Entry("LINE", "jp.naver.line.android"),
         Entry("TikTok Lite", "com.ss.android.ugc.tiktok.lite")
     )
