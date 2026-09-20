@@ -1,0 +1,20 @@
+<resources>
+    <!-- ドットゲームUI（ポケモン赤のゲーム画面寄り）。白地＋黒太枠＋赤アクセント -->
+    <color name="pixel_bg">#FFFFFFFF</color>
+    <color name="pixel_ink">#FF000000</color>
+    <color name="pixel_accent">#FFD82800</color>
+    <color name="pixel_shadow">#FFA8A8A8</color>
+    <color name="pixel_sub">#FF585858</color>
+    <color name="pixel_disabled">#FFA8A8A8</color>
+
+    <!-- カテゴリ色。画面のクロームは白黒赤のまま、図の中身だけ8bit風の原色を使う -->
+    <color name="cat_app">#FF7C20A0</color>
+    <color name="cat_dl">#FF0058F8</color>
+    <color name="cat_photo">#FF00A800</color>
+    <color name="cat_video">#FFF87800</color>
+    <color name="cat_music">#FF00B8B8</color>
+    <color name="cat_other">#FF787878</color>
+    <color name="cat_system">#FFA8A8A8</color>
+    <color name="cat_dummy">#FFD82800</color>
+    <color name="cat_free">#FFE8E8E8</color>
+</resources>

@@ -1,0 +1,107 @@
+# 容量埋めテスト（StorageFiller）
+
+端末の内蔵ストレージにダミーファイルを作って、**わざと容量を埋める**Androidアプリです。
+ストレージが少ない状態での動作確認や、端末スペックの確認に使います。
+
+Google Play で配信されていた「容量変更管理」（jp.systemcoreworks.storagemanager）が非公開になったため、同等の機能を自製したものです。
+
+<br>
+
+## ダウンロード
+
+**[最新版のAPKはこちら（Releases）](https://github.com/miominase/storage-filler/releases/latest)**
+
+インストール手順は[下のほう](#インストール)にあります。
+
+<br>
+
+## できること
+
+| 機能 | 内容 |
+|---|---|
+| 容量を埋める | 写真・動画・音楽・DL・アプリの5フォルダにダミーファイルを均等に作ります |
+| 埋める量の指定 | 空き容量の割合（30/60/70%）と固定サイズ（100MB〜50GB） |
+| 保存先の選択 | 5カテゴリをタップで個別にオン／オフできます |
+| 円グラフ | ストレージの内訳を種類別に表示。ダミーの割合が一目で分かります |
+| まとめて削除 | 作ったファイルだけを記録しているので、元からあるデータは消しません |
+| 個別削除 | 一覧から1件ずつ消せます |
+| 端末スペック表示 | モデル名・Androidバージョン・CPU・RAM・ストレージ容量 |
+| 稼働時間表示 | 再起動からの経過時間（スリープ込み／除外の2種類） |
+| 画面常時点灯 | 書き込み中は画面が消えません |
+
+書き込み速度は実機で **約280 MB/s** 出ます（Nothing A015 / Android 16 で計測）。
+
+<br>
+
+## インストール
+
+1. [Releases](https://github.com/miominase/storage-filler/releases/latest) から `StorageFiller-vX.Y.Z.apk` をダウンロード
+2. 開こうとすると「提供元不明のアプリ」の警告が出るので、ブラウザに**インストールを許可**する
+3. インストール後、アプリを開いて「**ストレージ権限を許可**」をタップ
+4. 設定画面で「**すべてのファイルへのアクセス**」をオンにする
+
+アプリは Google Play を通していないため、この手順が必要です。
+
+### 動作環境
+
+- **Android 7.0（API 24）以上**
+- **root不要** — 公式の標準APIだけを使っています
+
+<br>
+
+## 注意
+
+- **ダミーファイルは `/storage/emulated/0/StorageFillTest/` に作られます。** アプリの「全削除」で消せます
+- **空き容量を使い切る直前（残り8MB）で自動的に止まります**が、大きい容量を指定するときは気をつけてください
+- 削除はアプリが自分で作ったファイルの記録に基づいて行うので、**元からあるデータを誤って消すことはありません**
+- Android 11 以降は、全ファイルアクセスを許可してもアプリの内部データ領域は読み取れません。円グラフではその分を「システム」としてまとめて表示しています
+
+<br>
+
+## ビルド
+
+```
+./gradlew assembleDebug
+```
+
+`local.properties` に Android SDK の場所を書いてください。
+
+```
+sdk.dir=/path/to/Android/Sdk
+```
+
+| 項目 | バージョン |
+|---|---|
+| JDK | 21 |
+| Gradle | 8.9 |
+| Android Gradle Plugin | 8.7.3 |
+| Kotlin | 2.0.21 |
+| compileSdk / targetSdk | 35 |
+| minSdk | 24 |
+
+Kotlin + プレーン `Activity` + XMLレイアウトで、**外部ライブラリへの依存はありません**（androidx も使っていません）。
+
+仕様の詳細は [SPEC.md](SPEC.md) にあります。
+
+<br>
+
+## 画面デザインについて
+
+v0.4.0 でドット絵ゲーム風のUIにしています。白地＋黒の太枠＋赤のアクセントという配色で、円グラフも四角いマス目を1つずつ塗る方式で描いています。
+
+<br>
+
+## ライセンス
+
+### このアプリ
+
+MIT License — [LICENSE](LICENSE) を参照してください。
+
+### 同梱フォント
+
+[PixelMplus](https://github.com/itouhiro/PixelMplus) 12（Regular / Bold）を `app/src/main/assets/fonts/` に同梱しています。
+
+> Copyright (C) 2002-2013 M+ FONTS PROJECT
+> M+ FONT LICENSE（使用・複製・配布・改変が、商用非商用を問わず無制限に許可されています）
+
+ライセンス全文は [app/src/main/assets/fonts/LICENSE_M+](app/src/main/assets/fonts/LICENSE_M+) に同梱しています。

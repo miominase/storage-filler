@@ -1,0 +1,11 @@
+# プロジェクト固有
+local.properties
+.gradle/
+build/
+app/build/
+.kotlin/
+*.iml
+.idea/
+
+# APKはGitHub Releasesで配布（リポジトリには含めない）
+releases/*.apk

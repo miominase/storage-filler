@@ -1,0 +1,26 @@
+<resources>
+    <style name="Theme.StorageFiller" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">@color/pixel_accent</item>
+        <item name="android:windowBackground">@color/pixel_bg</item>
+    </style>
+
+    <!-- ドットUI: 角丸なし・黒枠。塗りと文字色はコード側で選択状態に応じて切り替える -->
+    <style name="Chip">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_margin">3dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="PresetButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_margin">4dp</item>
+        <item name="android:background">@drawable/btn_pixel</item>
+        <item name="android:textColor">@color/pixel_ink</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+</resources>
