@@ -19,6 +19,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.io.File
@@ -39,9 +40,15 @@ class MainActivity : Activity(), FillEngine.Listener {
     private lateinit var dummyHeader: TextView
     private lateinit var logText: TextView
     private lateinit var setupContainer: LinearLayout
+    private lateinit var catchButton: Button
+    private lateinit var catchImage: ImageView
+    private lateinit var catchStatusText: TextView
     private lateinit var updateStatusText: TextView
     private lateinit var updateCheckButton: Button
     private lateinit var updateInstallButton: Button
+
+    @Volatile
+    private var catching = false
 
     /** 「アップデートを確認」で見つかった新バージョン。未確認・最新のときは null */
     private var pendingUpdate: UpdateChecker.Release? = null
@@ -113,6 +120,9 @@ class MainActivity : Activity(), FillEngine.Listener {
         dummyHeader = findViewById(R.id.dummyHeader)
         logText = findViewById(R.id.logText)
         setupContainer = findViewById(R.id.setupContainer)
+        catchButton = findViewById(R.id.catchButton)
+        catchImage = findViewById(R.id.catchImage)
+        catchStatusText = findViewById(R.id.catchStatusText)
         updateStatusText = findViewById(R.id.updateStatusText)
         updateCheckButton = findViewById(R.id.updateCheckButton)
         updateInstallButton = findViewById(R.id.updateInstallButton)
@@ -138,6 +148,7 @@ class MainActivity : Activity(), FillEngine.Listener {
         findViewById<Button>(R.id.rescanButton).setOnClickListener { startScan(force = true) }
         findViewById<Button>(R.id.deleteAllButton).setOnClickListener { deleteAll() }
         permissionButton.setOnClickListener { requestStoragePermission() }
+        catchButton.setOnClickListener { catchPokemon() }
         updateCheckButton.setOnClickListener { checkForUpdate() }
         updateInstallButton.setOnClickListener { downloadAndInstall() }
         updateStatusText.text = "現在のバージョン: ${BuildConfig.VERSION_NAME}"
@@ -506,6 +517,33 @@ class MainActivity : Activity(), FillEngine.Listener {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         updatePermissionStatus()
         if (hasStoragePermission()) startScan()
+    }
+
+    // ---- 捕まえる（アイコン画像のランダム保存） ----
+
+    private fun catchPokemon() {
+        if (catching) return
+        catching = true
+        catchButton.isEnabled = false
+        catchStatusText.text = "捕まえています..."
+        Thread {
+            val caught = PokemonCatcher.catchOne(this)
+            runOnUiThread {
+                catching = false
+                catchButton.isEnabled = true
+                if (caught == null) {
+                    catchStatusText.text = "逃げられました（通信か保存に失敗）"
+                    appendLog("捕まえる: 失敗")
+                } else {
+                    catchImage.setImageBitmap(caught.image)
+                    catchImage.visibility = View.VISIBLE
+                    catchStatusText.text =
+                        "No.${caught.number} を捕まえた！" +
+                            "\n保存先: ${caught.savedTo}"
+                    appendLog("捕まえる: No.${caught.number} -> ${caught.savedTo}")
+                }
+            }
+        }.start()
     }
 
     // ---- セットアップ（Playへの導線） ----
