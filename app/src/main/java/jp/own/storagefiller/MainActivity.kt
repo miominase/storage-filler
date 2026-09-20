@@ -38,6 +38,7 @@ class MainActivity : Activity(), FillEngine.Listener {
     private lateinit var dummyListContainer: LinearLayout
     private lateinit var dummyHeader: TextView
     private lateinit var logText: TextView
+    private lateinit var setupContainer: LinearLayout
     private lateinit var updateStatusText: TextView
     private lateinit var updateCheckButton: Button
     private lateinit var updateInstallButton: Button
@@ -111,12 +112,14 @@ class MainActivity : Activity(), FillEngine.Listener {
         dummyListContainer = findViewById(R.id.dummyListContainer)
         dummyHeader = findViewById(R.id.dummyHeader)
         logText = findViewById(R.id.logText)
+        setupContainer = findViewById(R.id.setupContainer)
         updateStatusText = findViewById(R.id.updateStatusText)
         updateCheckButton = findViewById(R.id.updateCheckButton)
         updateInstallButton = findViewById(R.id.updateInstallButton)
 
         engine = FillEngine(this, this)
 
+        buildSetupList()
         applyPixelFont(findViewById(android.R.id.content))
         donutChart.setTypeface(pixelFontBold)
 
@@ -503,6 +506,47 @@ class MainActivity : Activity(), FillEngine.Listener {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         updatePermissionStatus()
         if (hasStoragePermission()) startScan()
+    }
+
+    // ---- セットアップ（Playへの導線） ----
+
+    private fun buildSetupList() {
+        setupContainer.removeAllViews()
+        val gap = (4f * resources.displayMetrics.density).toInt()
+        for ((index, app) in SetupApps.LIST.withIndex()) {
+            val button = Button(this).apply {
+                text = app.label
+                textSize = 14f
+                // Button は既定で英字を大文字化するので切る（「Google レンズ」が GOOGLE レンズ になる）
+                isAllCaps = false
+                setTextColor(color(R.color.pixel_ink))
+                setBackgroundResource(R.drawable.btn_pixel)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { if (index > 0) topMargin = gap }
+                setOnClickListener { openPlayPage(app) }
+            }
+            setupContainer.addView(button)
+        }
+    }
+
+    /** Play アプリでページを開く。Play が無い端末ではブラウザにフォールバックする */
+    private fun openPlayPage(app: SetupApps.Entry) {
+        val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${app.pkg}"))
+        val web = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse("https://play.google.com/store/apps/details?id=${app.pkg}")
+        )
+        try {
+            startActivity(market)
+        } catch (_: Exception) {
+            try {
+                startActivity(web)
+            } catch (e: Exception) {
+                appendLog("Playを開けませんでした: ${app.label} (${e.message})")
+            }
+        }
     }
 
     // ---- アップデート ----

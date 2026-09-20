@@ -318,6 +318,24 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
+            android:text="セットアップ"
+            android:textColor="@color/pixel_ink"
+            android:textSize="13sp" />
+
+        <!-- 中身は SetupApps.LIST からコードで生成する -->
+        <LinearLayout
+            android:id="@+id/setupContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/window_frame"
+            android:orientation="vertical"
+            android:padding="10dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
             android:text="アップデート"
             android:textColor="@color/pixel_ink"
             android:textSize="13sp" />
