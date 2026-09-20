@@ -38,6 +38,15 @@ class MainActivity : Activity(), FillEngine.Listener {
     private lateinit var dummyListContainer: LinearLayout
     private lateinit var dummyHeader: TextView
     private lateinit var logText: TextView
+    private lateinit var updateStatusText: TextView
+    private lateinit var updateCheckButton: Button
+    private lateinit var updateInstallButton: Button
+
+    /** 「アップデートを確認」で見つかった新バージョン。未確認・最新のときは null */
+    private var pendingUpdate: UpdateChecker.Release? = null
+
+    @Volatile
+    private var updateBusy = false
 
     private lateinit var engine: FillEngine
     private val handler = Handler(Looper.getMainLooper())
@@ -102,6 +111,9 @@ class MainActivity : Activity(), FillEngine.Listener {
         dummyListContainer = findViewById(R.id.dummyListContainer)
         dummyHeader = findViewById(R.id.dummyHeader)
         logText = findViewById(R.id.logText)
+        updateStatusText = findViewById(R.id.updateStatusText)
+        updateCheckButton = findViewById(R.id.updateCheckButton)
+        updateInstallButton = findViewById(R.id.updateInstallButton)
 
         engine = FillEngine(this, this)
 
@@ -123,6 +135,9 @@ class MainActivity : Activity(), FillEngine.Listener {
         findViewById<Button>(R.id.rescanButton).setOnClickListener { startScan(force = true) }
         findViewById<Button>(R.id.deleteAllButton).setOnClickListener { deleteAll() }
         permissionButton.setOnClickListener { requestStoragePermission() }
+        updateCheckButton.setOnClickListener { checkForUpdate() }
+        updateInstallButton.setOnClickListener { downloadAndInstall() }
+        updateStatusText.text = "現在のバージョン: ${BuildConfig.VERSION_NAME}"
 
         updateDeviceInfo()
         updatePermissionStatus()
@@ -488,6 +503,103 @@ class MainActivity : Activity(), FillEngine.Listener {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         updatePermissionStatus()
         if (hasStoragePermission()) startScan()
+    }
+
+    // ---- アップデート ----
+
+    private fun checkForUpdate() {
+        if (updateBusy) return
+        updateBusy = true
+        updateCheckButton.isEnabled = false
+        updateInstallButton.visibility = View.GONE
+        pendingUpdate = null
+        updateStatusText.text = "確認中..."
+        Thread {
+            val latest = UpdateChecker.fetchLatest(BuildConfig.UPDATE_REPO)
+            runOnUiThread {
+                updateBusy = false
+                updateCheckButton.isEnabled = true
+                when {
+                    latest == null ->
+                        updateStatusText.text =
+                            "確認できませんでした（通信に失敗したか、リリースがありません）"
+
+                    UpdateChecker.isNewer(latest.version, BuildConfig.VERSION_NAME) -> {
+                        pendingUpdate = latest
+                        updateStatusText.text =
+                            "新しいバージョン v${latest.version} があります\n" +
+                                "現在: v${BuildConfig.VERSION_NAME} / " +
+                                DeviceInfo.formatBytes(latest.sizeBytes)
+                        updateInstallButton.visibility = View.VISIBLE
+                    }
+
+                    else ->
+                        updateStatusText.text =
+                            "最新です（v${BuildConfig.VERSION_NAME}）"
+                }
+            }
+        }.start()
+    }
+
+    private fun downloadAndInstall() {
+        val release = pendingUpdate ?: return
+        if (updateBusy) return
+
+        // API 26+ は「不明なアプリのインストール」をこのアプリに許可してもらう必要がある
+        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+            updateStatusText.text = "設定で「不明なアプリのインストール」を許可してください"
+            startActivity(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                    .setData(Uri.parse("package:$packageName"))
+            )
+            return
+        }
+
+        updateBusy = true
+        updateInstallButton.isEnabled = false
+        updateCheckButton.isEnabled = false
+        Thread {
+            var lastShown = 0L
+            val file = UpdateChecker.download(this, release) { done, total ->
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastShown >= 100L || done >= total) {
+                    lastShown = now
+                    val pct = if (total > 0) (done * 100 / total).toInt() else 0
+                    runOnUiThread {
+                        updateStatusText.text = "ダウンロード中: $pct%  " +
+                            "${DeviceInfo.formatBytes(done)} / ${DeviceInfo.formatBytes(total)}"
+                    }
+                }
+            }
+            runOnUiThread {
+                updateBusy = false
+                updateInstallButton.isEnabled = true
+                updateCheckButton.isEnabled = true
+                if (file == null) {
+                    updateStatusText.text = "ダウンロードに失敗しました"
+                    appendLog("アップデート: ダウンロード失敗")
+                } else {
+                    updateStatusText.text = "インストーラーを起動しました"
+                    appendLog("アップデート: v${release.version} をダウンロード完了")
+                    launchInstaller(file)
+                }
+            }
+        }.start()
+    }
+
+    private fun launchInstaller(file: File) {
+        val uri = ApkProvider.uriFor(this, file)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            updateStatusText.text = "インストーラーを起動できませんでした"
+            appendLog("アップデート: インストーラー起動失敗 (${e.message})")
+        }
     }
 
     // ---- FillEngine.Listener（別スレッドから呼ばれる） ----

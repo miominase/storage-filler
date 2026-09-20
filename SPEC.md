@@ -97,6 +97,29 @@
 - アダプティブは 108dp キャンバスの中央 72dp が可視域。ボールは pad 0.18 で少し内側に収め、円マスクでも黒枠が欠けないようにする
 - **内部パーツ（黒枠・帯・中央ボタン）はキャンバスサイズではなくボール直径基準で算出する。** キャンバス基準だと余白の違うアダプティブ版で比率が崩れる
 
+### F11. アプリ内アップデート（v0.5.0追加）
+
+- 端末情報の下に「アップデート」欄を置き、**ボタンを押したときだけ**確認する（自動確認はしない）
+- 取得元: `https://api.github.com/repos/{UPDATE_REPO}/releases/latest`（公開リポジトリなので認証不要）
+  - リポジトリは `BuildConfig.UPDATE_REPO` で持つ。移設時はここだけ変える
+  - 未認証のGitHub APIは60回/時（IP単位）。手動ボタンなら問題にならない
+- タグ名（`v0.5.0`）から `v` を除き、`BuildConfig.VERSION_NAME` と**数値で**比較する
+  - 文字列比較だと `0.10.0 < 0.9.0` になるため、ドット区切りで数値化して比べる
+- 新しければ「ダウンロードしてインストール」を表示 → `cacheDir/update/` に保存 → インストーラーを起動
+- 通信は `HttpsURLConnection`、JSONは `org.json`。**どちらもAndroid標準なので依存ライブラリは増やさない**
+- APKの受け渡しは自前の `ApkProvider`（`ContentProvider`）。API 24+ は `file://` を外部に渡せないため `content://` が必要で、androidx の FileProvider は使わない方針のため自作する
+  - 公開範囲は `cacheDir/update` 配下のみ。`..` やパス区切りを含むURIは拒否する
+- API 26+ は `canRequestPackageInstalls()` を確認し、未許可なら `ACTION_MANAGE_UNKNOWN_APP_SOURCES` へ誘導
+- 追加権限: `INTERNET` / `ACCESS_NETWORK_STATE` / `REQUEST_INSTALL_PACKAGES`
+
+### 署名（v0.5.0以降）
+
+- **専用のリリース鍵で署名する。** Androidは署名の異なるAPKを上書きできないため、アップデート機構は同一鍵で署名し続けることが前提になる
+- 鍵はリポジトリ外（`~/.android/storage-filler-release.jks`）。パスと3つのパスワードは `keystore.properties`（gitignore済み）に置く
+- `keystore.properties` が無い環境では署名設定を読み込まず、`assembleDebug` だけが通る
+- **鍵ファイルとパスワードの両方を失うと、既存インストールへの上書き更新が永久にできなくなる**
+
+
 ## 非機能要件
 
 - minSdk 24（Android 7.0）/ targetSdk 35 / compileSdk 35
@@ -116,5 +139,5 @@
 
 ## 配布
 
-- `gradlew assembleDebug` でAPK生成 → `releases/StorageFiller-v{version}.apk`
+- `gradlew assembleRelease` でAPK生成（v0.5.0以降。リリース鍵で署名される） → `releases/StorageFiller-v{version}.apk`
 - git タグ `storage-filler-v{version}` → push → GitHub Releases にAPK添付

@@ -1,5 +1,8 @@
 # プロジェクト固有
 local.properties
+keystore.properties
+*.jks
+*.keystore
 .gradle/
 build/
 app/build/

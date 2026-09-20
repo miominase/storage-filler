@@ -5,6 +5,11 @@
         android:maxSdkVersion="28" />
     <!-- API 30+: 全てのファイルアクセス（設定画面でユーザーが許可） -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <!-- アップデート確認: GitHub Releases の参照とAPKのダウンロードにのみ使う -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- ダウンロードしたAPKのインストールを起動する（ユーザーが設定で許可する必要あり） -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:allowBackup="false"
@@ -21,5 +26,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- ダウンロードしたAPKをインストーラーに content:// で渡すための provider -->
+        <provider
+            android:name=".ApkProvider"
+            android:authorities="${applicationId}.apkprovider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>
