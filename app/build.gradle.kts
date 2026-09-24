@@ -21,8 +21,8 @@ android {
         applicationId = "jp.own.storagefiller"
         minSdk = 24
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.7.1"
+        versionCode = 10
+        versionName = "0.8.0"
 
         // アプリ内アップデートの取得元。リポジトリを移す場合はここだけ変える
         buildConfigField("String", "UPDATE_REPO", "\"miominase/storage-filler\"")
@@ -55,7 +55,19 @@ android {
         buildConfig = true
     }
 
+    // 純ロジックだけを対象にした JVM 単体テスト。APKには含まれない。
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     kotlinOptions {
         jvmTarget = "17"
     }
+}
+
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+    // JVM単体テストではandroid.jarのorg.jsonはスタブ（put()がnullを返す等）で動かないため、
+    // テストのみ実体を使う。APKにはAndroid実機のorg.jsonが使われるため影響しない。
+    testImplementation("org.json:json:20231013")
 }

@@ -1,442 +1,480 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/pixel_bg">
-    <LinearLayout
+
+    <ScrollView
+        android:id="@+id/storagePanel"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
-
+        android:layout_height="match_parent"
+        android:background="@color/pixel_bg">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/window_frame"
             android:orientation="vertical"
-            android:padding="10dp">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="ストレージ管理"
-                android:textColor="@color/pixel_ink"
-                android:textSize="26sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="容量割り当てツール"
-                android:textColor="@color/pixel_sub"
-                android:textSize="13sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/window_frame"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:padding="10dp">
-
-            <jp.own.storagefiller.DonutChartView
-                android:id="@+id/donutChart"
-                android:layout_width="150dp"
-                android:layout_height="150dp" />
+            android:paddingStart="16dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="88dp">
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:background="@drawable/window_frame"
+                android:orientation="vertical"
+                android:padding="10dp">
 
                 <TextView
-                    android:id="@+id/statsText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="ストレージ管理"
+                    android:textColor="@color/pixel_ink"
+                    android:textSize="26sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="容量割り当てツール"
+                    android:textColor="@color/pixel_sub"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/window_frame"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="10dp">
+
+                <jp.own.storagefiller.DonutChartView
+                    android:id="@+id/donutChart"
+                    android:layout_width="150dp"
+                    android:layout_height="150dp" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/statsText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/pixel_ink"
+                        android:textIsSelectable="true"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/uptimeText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/pixel_ink"
+                        android:textSize="14sp" />
+
+                    <Button
+                        android:id="@+id/rescanButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/btn_pixel"
+                        android:minHeight="0dp"
+                        android:padding="8dp"
+                        android:text="ストレージを再計測"
+                        android:textColor="@color/pixel_ink"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/statusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/btn_pixel"
+                android:gravity="center"
+                android:padding="10dp"
+                android:text="準備完了"
+                android:textColor="@color/pixel_ink"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/progressText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textColor="@color/pixel_sub"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/stopButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/btn_pixel"
+                android:enabled="false"
+                android:padding="14dp"
+                android:text="書き込みを中止して保存"
+                android:textColor="@color/pixel_shadow"
+                android:textSize="16sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="保存先フォルダ"
+                android:textColor="@color/pixel_ink"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/chipRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/chipApps"
+                    style="@style/Chip"
+                    android:text="APP" />
+
+                <TextView
+                    android:id="@+id/chipDownload"
+                    style="@style/Chip"
+                    android:text="DL" />
+
+                <TextView
+                    android:id="@+id/chipPictures"
+                    style="@style/Chip"
+                    android:text="写真" />
+
+                <TextView
+                    android:id="@+id/chipMovies"
+                    style="@style/Chip"
+                    android:text="動画" />
+
+                <TextView
+                    android:id="@+id/chipMusic"
+                    style="@style/Chip"
+                    android:text="音楽" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="現在の空き容量から割合で埋める"
+                android:textColor="@color/pixel_ink"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/pct30"
+                    style="@style/PresetButton"
+                    android:text="30%" />
+
+                <Button
+                    android:id="@+id/pct60"
+                    style="@style/PresetButton"
+                    android:text="60%" />
+
+                <Button
+                    android:id="@+id/pct70"
+                    style="@style/PresetButton"
+                    android:text="70%" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="サイズで固定指定（通常 / 特大）"
+                android:textColor="@color/pixel_ink"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/size100mb"
+                    style="@style/PresetButton"
+                    android:text="100MB" />
+
+                <Button
+                    android:id="@+id/size1gb"
+                    style="@style/PresetButton"
+                    android:text="1GB" />
+
+                <Button
+                    android:id="@+id/size5gb"
+                    style="@style/PresetButton"
+                    android:text="5GB" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/size10gb"
+                    style="@style/PresetButton"
+                    android:text="10GB" />
+
+                <Button
+                    android:id="@+id/size30gb"
+                    style="@style/PresetButton"
+                    android:text="30GB" />
+
+                <Button
+                    android:id="@+id/size50gb"
+                    style="@style/PresetButton"
+                    android:text="50GB" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/dummyHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:text="▶ 作成済みのダミーデータ（削除用）"
+                android:textColor="@color/pixel_ink"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/deleteAllButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/btn_pixel_accent"
+                android:text="全削除"
+                android:textColor="@color/pixel_accent" />
+
+            <LinearLayout
+                android:id="@+id/dummyListContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="端末情報"
+                android:textColor="@color/pixel_ink"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/window_frame"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <TextView
+                    android:id="@+id/deviceInfoText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textColor="@color/pixel_ink"
                     android:textIsSelectable="true"
-                    android:textSize="14sp" />
+                    android:textSize="12sp" />
 
                 <TextView
-                    android:id="@+id/uptimeText"
+                    android:id="@+id/uptimeNoSleepText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="@color/pixel_ink"
-                    android:textSize="14sp" />
-
-                <Button
-                    android:id="@+id/rescanButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:background="@drawable/btn_pixel"
-                    android:minHeight="0dp"
-                    android:padding="8dp"
-                    android:text="ストレージを再計測"
                     android:textColor="@color/pixel_ink"
                     android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/permissionStatusText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/pixel_ink"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/permissionButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/btn_pixel"
+                    android:text="ストレージ権限を許可"
+                    android:textColor="@color/pixel_ink" />
             </LinearLayout>
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/statusText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/btn_pixel"
-            android:gravity="center"
-            android:padding="10dp"
-            android:text="準備完了"
-            android:textColor="@color/pixel_ink"
-            android:textSize="15sp" />
-
-        <TextView
-            android:id="@+id/progressText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:textColor="@color/pixel_sub"
-            android:textSize="12sp" />
-
-        <Button
-            android:id="@+id/stopButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/btn_pixel"
-            android:enabled="false"
-            android:padding="14dp"
-            android:text="書き込みを中止して保存"
-            android:textColor="@color/pixel_shadow"
-            android:textSize="16sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="保存先フォルダ"
-            android:textColor="@color/pixel_ink"
-            android:textSize="13sp" />
-
-        <LinearLayout
-            android:id="@+id/chipRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
 
             <TextView
-                android:id="@+id/chipApps"
-                style="@style/Chip"
-                android:text="APP" />
-
-            <TextView
-                android:id="@+id/chipDownload"
-                style="@style/Chip"
-                android:text="DL" />
-
-            <TextView
-                android:id="@+id/chipPictures"
-                style="@style/Chip"
-                android:text="写真" />
-
-            <TextView
-                android:id="@+id/chipMovies"
-                style="@style/Chip"
-                android:text="動画" />
-
-            <TextView
-                android:id="@+id/chipMusic"
-                style="@style/Chip"
-                android:text="音楽" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="現在の空き容量から割合で埋める"
-            android:textColor="@color/pixel_ink"
-            android:textSize="13sp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/pct30"
-                style="@style/PresetButton"
-                android:text="30%" />
-
-            <Button
-                android:id="@+id/pct60"
-                style="@style/PresetButton"
-                android:text="60%" />
-
-            <Button
-                android:id="@+id/pct70"
-                style="@style/PresetButton"
-                android:text="70%" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="サイズで固定指定（通常 / 特大）"
-            android:textColor="@color/pixel_ink"
-            android:textSize="13sp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/size100mb"
-                style="@style/PresetButton"
-                android:text="100MB" />
-
-            <Button
-                android:id="@+id/size1gb"
-                style="@style/PresetButton"
-                android:text="1GB" />
-
-            <Button
-                android:id="@+id/size5gb"
-                style="@style/PresetButton"
-                android:text="5GB" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/size10gb"
-                style="@style/PresetButton"
-                android:text="10GB" />
-
-            <Button
-                android:id="@+id/size30gb"
-                style="@style/PresetButton"
-                android:text="30GB" />
-
-            <Button
-                android:id="@+id/size50gb"
-                style="@style/PresetButton"
-                android:text="50GB" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/dummyHeader"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
-            android:text="▶ 作成済みのダミーデータ（削除用）"
-            android:textColor="@color/pixel_ink"
-            android:textSize="13sp" />
-
-        <Button
-            android:id="@+id/deleteAllButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/btn_pixel_accent"
-            android:text="全削除"
-            android:textColor="@color/pixel_accent" />
-
-        <LinearLayout
-            android:id="@+id/dummyListContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="端末情報"
-            android:textColor="@color/pixel_ink"
-            android:textSize="13sp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/window_frame"
-            android:orientation="vertical"
-            android:padding="10dp">
-
-            <TextView
-                android:id="@+id/deviceInfoText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="捕まえる"
                 android:textColor="@color/pixel_ink"
-                android:textIsSelectable="true"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/uptimeNoSleepText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@color/pixel_ink"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/permissionStatusText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textColor="@color/pixel_ink"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <Button
-                android:id="@+id/permissionButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:background="@drawable/btn_pixel"
-                android:text="ストレージ権限を許可"
-                android:textColor="@color/pixel_ink" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="捕まえる"
-            android:textColor="@color/pixel_ink"
-            android:textSize="13sp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/window_frame"
-            android:orientation="vertical"
-            android:padding="10dp">
-
-            <Button
-                android:id="@+id/catchButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/btn_pixel_accent"
-                android:text="捕まえる！"
-                android:textColor="@color/pixel_accent"
-                android:textSize="16sp" />
+                android:textSize="13sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:layout_marginTop="4dp"
+                android:background="@drawable/window_frame"
+                android:orientation="vertical"
+                android:padding="10dp">
 
-                <ImageView
-                    android:id="@+id/catchImage"
-                    android:layout_width="96dp"
-                    android:layout_height="96dp"
-                    android:background="@drawable/btn_pixel"
-                    android:contentDescription="捕まえた画像"
-                    android:padding="2dp"
-                    android:scaleType="fitCenter"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/catchStatusText"
-                    android:layout_width="0dp"
+                <Button
+                    android:id="@+id/catchButton"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:layout_weight="1"
-                    android:textColor="@color/pixel_ink"
-                    android:textSize="12sp" />
+                    android:background="@drawable/btn_pixel_accent"
+                    android:text="捕まえる！"
+                    android:textColor="@color/pixel_accent"
+                    android:textSize="16sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/catchImage"
+                        android:layout_width="96dp"
+                        android:layout_height="96dp"
+                        android:background="@drawable/btn_pixel"
+                        android:contentDescription="捕まえた画像"
+                        android:padding="2dp"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/catchStatusText"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:textColor="@color/pixel_ink"
+                        android:textSize="12sp" />
+                </LinearLayout>
             </LinearLayout>
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="セットアップ"
-            android:textColor="@color/pixel_ink"
-            android:textSize="13sp" />
-
-        <!-- 中身は SetupApps.LIST からコードで生成する -->
-        <LinearLayout
-            android:id="@+id/setupContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/window_frame"
-            android:orientation="vertical"
-            android:padding="10dp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="アップデート"
-            android:textColor="@color/pixel_ink"
-            android:textSize="13sp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/window_frame"
-            android:orientation="vertical"
-            android:padding="10dp">
 
             <TextView
-                android:id="@+id/updateStatusText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="セットアップ"
                 android:textColor="@color/pixel_ink"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
 
-            <Button
-                android:id="@+id/updateCheckButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/btn_pixel"
-                android:text="アップデートを確認"
-                android:textColor="@color/pixel_ink"
-                android:textSize="14sp" />
-
-            <Button
-                android:id="@+id/updateInstallButton"
+            <!-- 中身は SetupApps.LIST からコードで生成する -->
+            <LinearLayout
+                android:id="@+id/setupContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:background="@drawable/btn_pixel_accent"
-                android:text="ダウンロードしてインストール"
-                android:textColor="@color/pixel_accent"
-                android:textSize="14sp"
-                android:visibility="gone" />
-        </LinearLayout>
+                android:background="@drawable/window_frame"
+                android:orientation="vertical"
+                android:padding="10dp" />
 
-        <TextView
-            android:id="@+id/logText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:textColor="@color/pixel_sub"
-            android:textIsSelectable="true"
-            android:textSize="11sp" />
-    </LinearLayout>
-</ScrollView>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="アップデート"
+                android:textColor="@color/pixel_ink"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/window_frame"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <TextView
+                    android:id="@+id/updateStatusText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/pixel_ink"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/updateCheckButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/btn_pixel"
+                    android:text="アップデートを確認"
+                    android:textColor="@color/pixel_ink"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/updateInstallButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/btn_pixel_accent"
+                    android:text="ダウンロードしてインストール"
+                    android:textColor="@color/pixel_accent"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/logText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textColor="@color/pixel_sub"
+                android:textIsSelectable="true"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </ScrollView>
+
+    <ScrollView
+        android:id="@+id/challengePanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/pixel_bg"
+        android:visibility="gone">
+
+        <include layout="@layout/panel_challenge" />
+    </ScrollView>
+
+    <!-- 入力欄やスクロールを隠さないよう、右下に小さく置く -->
+    <Button
+        android:id="@+id/menuButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/btn_pixel_menu"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:paddingStart="14dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="10dp"
+        android:text="▶ きろく"
+        android:textColor="@color/pixel_ink"
+        android:textSize="13sp" />
+</FrameLayout>

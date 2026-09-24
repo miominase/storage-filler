@@ -17,6 +17,7 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.ImageView
@@ -46,6 +47,11 @@ class MainActivity : Activity(), FillEngine.Listener {
     private lateinit var updateStatusText: TextView
     private lateinit var updateCheckButton: Button
     private lateinit var updateInstallButton: Button
+    private lateinit var storagePanel: View
+    private lateinit var challengePanel: View
+    private lateinit var menuButton: Button
+    private lateinit var challengePanelController: ChallengePanel
+    private var showingChallenge = false
 
     @Volatile
     private var catching = false
@@ -126,11 +132,15 @@ class MainActivity : Activity(), FillEngine.Listener {
         updateStatusText = findViewById(R.id.updateStatusText)
         updateCheckButton = findViewById(R.id.updateCheckButton)
         updateInstallButton = findViewById(R.id.updateInstallButton)
+        storagePanel = findViewById(R.id.storagePanel)
+        challengePanel = findViewById(R.id.challengePanel)
+        menuButton = findViewById(R.id.menuButton)
 
         engine = FillEngine(this, this)
 
         buildSetupList()
         applyPixelFont(findViewById(android.R.id.content))
+        challengePanelController = ChallengePanel(this, challengePanel, pixelFont, pixelFontBold)
         donutChart.setTypeface(pixelFontBold)
 
         setupChips()
@@ -153,11 +163,18 @@ class MainActivity : Activity(), FillEngine.Listener {
         updateInstallButton.setOnClickListener { downloadAndInstall() }
         updateStatusText.text = "現在のバージョン: ${BuildConfig.VERSION_NAME}"
 
+        menuButton.isAllCaps = false
+        menuButton.setOnClickListener { showPanel(!showingChallenge) }
+        applyMenuButtonInsets()
+        applyPanelTopInsets()
+        showPanel(false)
+
         updateDeviceInfo()
         updatePermissionStatus()
         refreshDummyList()
         updateStats()
         if (hasStoragePermission()) startScan()
+        handleIncomingIntent()
     }
 
     override fun onResume() {
@@ -170,6 +187,96 @@ class MainActivity : Activity(), FillEngine.Listener {
     override fun onPause() {
         handler.removeCallbacks(uptimeTicker)
         super.onPause()
+    }
+
+    /**
+     * singleTop なので、アプリを開いたままQRのリンクが飛んでくると新しいActivityではなく
+     * ここに来る。setIntent() で getIntent() の中身を差し替えてから同じ処理へ渡す。
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent()
+    }
+
+    /**
+     * QRコード経由で開かれた setup リンクを読む。
+     * 端末の標準カメラ（または他のアプリ）がデコードしてVIEWインテントとして投げてくる
+     * だけで、このアプリ自身はQRを一切デコードしない。
+     *
+     * QRの中身（URL・パスワード）はログへ一切出さない。取り出したら
+     * intent.data = null にして、回転や最近使ったアプリからの復帰で
+     * 再度適用されないようにする。
+     */
+    private fun handleIncomingIntent() {
+        val uri = intent.data ?: return
+        if (SetupLink.isSetupUri(uri)) {
+            challengePanelController.prefillFromUri(
+                uri.getQueryParameter("url"),
+                uri.getQueryParameter("password")
+            )
+            showPanel(true)
+            intent.data = null
+        }
+    }
+
+    /** 起動時は従来どおり容量管理を表示する。書き込み中でもパネル切替で処理は止めない。 */
+    private fun showPanel(challenge: Boolean) {
+        showingChallenge = challenge
+        storagePanel.visibility = if (challenge) View.GONE else View.VISIBLE
+        challengePanel.visibility = if (challenge) View.VISIBLE else View.GONE
+        menuButton.text = if (challenge) "▶ ようりょう" else "▶ きろく"
+        if (challenge) challengePanelController.onShown()
+    }
+
+    /**
+     * targetSdk 35 では Android 15+ が edge-to-edge を強制するため、
+     * layout_marginBottom="16dp" だけではナビゲーションバーの裏に隠れてタップできない。
+     * XML の16dpマージンにボトム側システムバーの高さを足し、ナビゲーションバーの上へ浮かせる。
+     * インセットは消費せず返し、他のビューにも届くようにする。
+     */
+    private fun applyMenuButtonInsets() {
+        val baseBottomMargin = (menuButton.layoutParams as ViewGroup.MarginLayoutParams).bottomMargin
+        menuButton.setOnApplyWindowInsetsListener { view, insets ->
+            val navBarInset = if (Build.VERSION.SDK_INT >= 30) {
+                insets.getInsets(WindowInsets.Type.systemBars()).bottom
+            } else {
+                @Suppress("DEPRECATION")
+                insets.systemWindowInsetBottom
+            }
+            val lp = view.layoutParams as ViewGroup.MarginLayoutParams
+            lp.bottomMargin = baseBottomMargin + navBarInset
+            view.layoutParams = lp
+            insets
+        }
+    }
+
+    /**
+     * 同じく edge-to-edge のため、両パネルの先頭がステータスバーの裏に入り、
+     * 時計・電池表示と見出しが重なる。上側システムバーの高さを ScrollView の
+     * paddingTop に足して逃がす。clipToPadding は既定のままなので、
+     * スクロールした中身がステータスバーの帯へはみ出すこともない。
+     * インセットは消費せず返し、兄弟のメニューボタンにも届くようにする。
+     */
+    private fun applyPanelTopInsets() {
+        for (panel in listOf(storagePanel, challengePanel)) {
+            val basePaddingTop = panel.paddingTop
+            panel.setOnApplyWindowInsetsListener { view, insets ->
+                val statusBarInset = if (Build.VERSION.SDK_INT >= 30) {
+                    insets.getInsets(WindowInsets.Type.systemBars()).top
+                } else {
+                    @Suppress("DEPRECATION")
+                    insets.systemWindowInsetTop
+                }
+                view.setPadding(
+                    view.paddingLeft,
+                    basePaddingTop + statusBarInset,
+                    view.paddingRight,
+                    view.paddingBottom
+                )
+                insets
+            }
+        }
     }
 
     /** ビューツリーを辿って全テキストにドットフォントを当てる。太字指定は太字フォントに差し替える */

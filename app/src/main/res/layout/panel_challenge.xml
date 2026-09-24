@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="16dp"
+    android:paddingTop="16dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="88dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/window_frame"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="チャレンジ記録"
+            android:textColor="@color/pixel_ink"
+            android:textSize="22sp" />
+
+        <TextView
+            android:id="@+id/boundDeviceText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/pixel_sub"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- 初回設定 -->
+    <LinearLayout
+        android:id="@+id/setupBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/window_frame"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="はじめの設定"
+            android:textColor="@color/pixel_ink"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/urlInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/btn_pixel"
+            android:hint="記録APIのURL"
+            android:inputType="textUri"
+            android:padding="8dp"
+            android:textColor="@color/pixel_ink"
+            android:textColorHint="@color/pixel_shadow"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/passwordInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/btn_pixel"
+            android:hint="共通パスワード"
+            android:inputType="textPassword"
+            android:padding="8dp"
+            android:textColor="@color/pixel_ink"
+            android:textColorHint="@color/pixel_shadow"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/deviceIdInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/btn_pixel"
+            android:hint="端末ID"
+            android:inputType="number"
+            android:padding="8dp"
+            android:textColor="@color/pixel_ink"
+            android:textColorHint="@color/pixel_shadow"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/clipboardImportButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/btn_pixel"
+            android:text="クリップボードから読み込む"
+            android:textColor="@color/pixel_ink"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/bindButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/btn_pixel"
+            android:text="この端末を紐づける"
+            android:textColor="@color/pixel_ink"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/setupStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/pixel_ink"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- 記録 -->
+    <LinearLayout
+        android:id="@+id/recordBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/window_frame"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="寝かせ時間（時間）"
+            android:textColor="@color/pixel_ink"
+            android:textSize="13sp" />
+
+        <EditText
+            android:id="@+id/hoursInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/btn_pixel"
+            android:inputType="numberDecimal"
+            android:padding="8dp"
+            android:textColor="@color/pixel_ink"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="使用サービス（必須）"
+            android:textColor="@color/pixel_ink"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/serviceLine"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_marginEnd="3dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="LINE"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/serviceGoogle"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="3dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Google"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <EditText
+            android:id="@+id/memoInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/btn_pixel"
+            android:hint="メモ（任意）"
+            android:inputType="text"
+            android:padding="8dp"
+            android:textColor="@color/pixel_ink"
+            android:textColorHint="@color/pixel_shadow"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/recordSuccessButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/btn_pixel"
+            android:text="成功で記録"
+            android:textColor="@color/pixel_ink"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/recordFailureButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/btn_pixel_accent"
+            android:text="失敗で記録"
+            android:textColor="@color/pixel_accent"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/recordStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="@color/pixel_ink"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/unbindButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/btn_pixel"
+            android:text="端末の紐づけを変更"
+            android:textColor="@color/pixel_sub"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- 未送信（Task 6 で中身を作る） -->
+    <TextView
+        android:id="@+id/pendingHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="未送信"
+        android:textColor="@color/pixel_ink"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/pendingContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/window_frame"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:visibility="gone" />
+</LinearLayout>

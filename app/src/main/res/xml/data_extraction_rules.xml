@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API 31+ 用。targetSdk 31 以上では allowBackup="false" はクラウドバックアップしか止めず、
+     端末間移行（新しいスマホの初期設定での「アプリとデータのコピー」）では filesDir や
+     SharedPreferences がそのまま移る。紐づけ（URL・共通パスワード・端末ID）と未送信キューは
+     端末ごとのものなので、どちらの経路でも持ち出さない。
+     - challenge.xml: ChallengeConfig の SharedPreferences（"challenge"）
+     - pending_records.json: PendingRecords.FILE_NAME -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="challenge.xml" />
+        <exclude domain="file" path="pending_records.json" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="challenge.xml" />
+        <exclude domain="file" path="pending_records.json" />
+    </device-transfer>
+</data-extraction-rules>
