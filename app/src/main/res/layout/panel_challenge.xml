@@ -70,7 +70,9 @@
             android:layout_marginTop="4dp"
             android:background="@drawable/btn_pixel"
             android:hint="共通パスワード"
+            android:importantForAutofill="no"
             android:inputType="textPassword"
+            android:saveEnabled="false"
             android:padding="8dp"
             android:textColor="@color/pixel_ink"
             android:textColorHint="@color/pixel_shadow"
@@ -88,6 +90,16 @@
             android:textColor="@color/pixel_ink"
             android:textColorHint="@color/pixel_shadow"
             android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/scanQrButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/btn_pixel"
+            android:text="QRを読み取る"
+            android:textColor="@color/pixel_ink"
+            android:textSize="14sp" />
 
         <Button
             android:id="@+id/clipboardImportButton"

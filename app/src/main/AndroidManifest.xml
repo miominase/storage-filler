@@ -24,8 +24,20 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.StorageFiller">
+        <!-- 紐づけ画面の「QRを読み取る」（Google Code Scanner）が使うスキャン画面のモジュールを、
+             Play ストア経由のインストール時に事前取得させる。APKを手動で入れた場合は効かないので、
+             初回はアプリ側（ChallengePanel.requestScannerModule）で取得を依頼する。
+             スキャン画面は Google Play 開発者サービス側が出すため CAMERA 権限は追加しない。 -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
+
+        <!-- 回転・ダークモード切替・外付けキーボードで作り直さない。横向き用・夜間用のリソースは
+             無いので並び直しだけで足りる。
+             作り直すと、表示中のパネル・案内文・スキャン中の読み取り結果が失われる。 -->
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|uiMode"
             android:exported="true"
             android:launchMode="singleTop">
             <intent-filter>

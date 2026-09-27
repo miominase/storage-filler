@@ -15,6 +15,15 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.google.android.gms.common.moduleinstall.InstallStatusListener
+import com.google.android.gms.common.moduleinstall.ModuleInstall
+import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
+import com.google.android.gms.common.moduleinstall.ModuleInstallStatusUpdate
+import com.google.mlkit.common.MlKitException
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanner
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -38,6 +47,7 @@ class ChallengePanel(
     private val urlInput: EditText = root.findViewById(R.id.urlInput)
     private val passwordInput: EditText = root.findViewById(R.id.passwordInput)
     private val deviceIdInput: EditText = root.findViewById(R.id.deviceIdInput)
+    private val scanQrButton: Button = root.findViewById(R.id.scanQrButton)
     private val clipboardImportButton: Button = root.findViewById(R.id.clipboardImportButton)
     private val bindButton: Button = root.findViewById(R.id.bindButton)
     private val setupStatusText: TextView = root.findViewById(R.id.setupStatusText)
@@ -57,11 +67,15 @@ class ChallengePanel(
 
     private var service: String = ""
 
+    /** QR読み取り画面を開いている間 true。二度押しで読み取り画面を重ねないため。 */
+    private var scanning = false
+
     init {
-        listOf(clipboardImportButton, bindButton, recordSuccessButton, recordFailureButton, unbindButton)
+        listOf(scanQrButton, clipboardImportButton, bindButton, recordSuccessButton, recordFailureButton, unbindButton)
             .forEach { it.isAllCaps = false }
         serviceLine.setOnClickListener { selectService("LINE") }
         serviceGoogle.setOnClickListener { selectService("Google") }
+        scanQrButton.setOnClickListener { scanQr() }
         clipboardImportButton.setOnClickListener { importFromClipboard() }
         bindButton.setOnClickListener { bind() }
         recordSuccessButton.setOnClickListener { record(ChallengeRecord.RESULT_SUCCESS) }
@@ -145,34 +159,52 @@ class ChallengePanel(
     fun prefillFromUri(url: String?, password: String?): Boolean {
         // 紐づけ済みならこの欄自体が非表示。紐づけを変えたい場合は先に解除してもらう。
         if (config.isBound()) return false
-        if (!url.isNullOrEmpty() && !ChallengeInput.isValidApiUrl(url)) {
-            setupStatusText.text = INVALID_URL_MESSAGE
-            return false
+        return when (val plan = SetupFill.plan(url, password)) {
+            SetupFill.Plan.Empty -> false
+            SetupFill.Plan.InvalidUrl -> {
+                setupStatusText.text = INVALID_URL_MESSAGE
+                false
+            }
+            is SetupFill.Plan.Fill -> {
+                plan.url?.let { urlInput.setText(it) }
+                plan.password?.let { passwordInput.setText(it) }
+                setupStatusText.text = "QRから読み込みました。端末IDを入れてください"
+                true
+            }
         }
-        var filled = false
-        if (!url.isNullOrEmpty()) {
-            urlInput.setText(url)
-            if (password.isNullOrEmpty()) passwordInput.setText("")
-            filled = true
-        }
-        if (!password.isNullOrEmpty()) {
-            passwordInput.setText(password)
-            filled = true
-        }
-        if (filled) {
-            setupStatusText.text = "QRから読み込みました。端末IDを入れてください"
-        }
-        return filled
+    }
+
+    /** 設定用テキストの入手経路。見つからなかったときの案内だけが違う。 */
+    private enum class SetupSource(val emptyMessage: String) {
+        CLIPBOARD("クリップボードに読み込める内容がありませんでした"),
+        SCAN("設定用のQRではありませんでした")
     }
 
     /**
-     * クリップボードのテキストをQRの内容として読み込む。標準カメラの多くはQRを開く手段を
-     * 提示せず「コピー」しか出さないため、この経路が主な入口になる。判定・抽出は
-     * `handleIncomingIntent` と共通の `SetupLink.parse()` を使い、実際に欄へ入れる処理は
+     * QRの中身（クリップボードの文字列、またはアプリ内で読み取った文字列）を解析して欄に入れる。
+     * 判定・抽出は `handleIncomingIntent` と共通の `SetupLink.parse()` を使い、欄へ入れる処理は
      * `prefillFromUri` をそのまま再利用する（紐づけ済みなら何もしない・端末IDは触らない・
-     * 自動送信しない、という規則もそちらに揃う）。
+     * 自動送信しない・不正なURLは入れない、という規則もそちらに揃う）。
      *
-     * クリップボードの中身（＝パスワードそのもの）はステータス表示にもログにも一切出さない。
+     * [text] はパスワードそのものを含むので、ステータス表示にもログにも一切出さない。
+     *
+     * @return 欄に何か入れたら true
+     */
+    private fun applySetupText(text: String?, source: SetupSource): Boolean {
+        if (config.isBound()) return false
+        val parsed = text?.let { SetupLink.parse(it) }
+        val url = parsed?.first
+        val password = parsed?.second
+        if (url.isNullOrEmpty() && password.isNullOrEmpty()) {
+            setupStatusText.text = source.emptyMessage
+            return false
+        }
+        return prefillFromUri(url, password)
+    }
+
+    /**
+     * クリップボードのテキストをQRの内容として読み込む。Google Play 開発者サービスがなく
+     * 「QRを読み取る」が使えない端末向けの予備の入口（標準カメラで読んで「コピー」してもらう）。
      * 読み込めたらクリップボードを空にする（キーボードのクリップボード履歴に残さないため）。
      */
     private fun importFromClipboard() {
@@ -184,14 +216,107 @@ class ChallengePanel(
         } else {
             null
         }
-        val parsed = text?.let { SetupLink.parse(it) }
-        val url = parsed?.first
-        val password = parsed?.second
-        if (url.isNullOrEmpty() && password.isNullOrEmpty()) {
-            setupStatusText.text = "クリップボードに読み込める内容がありませんでした"
+        if (applySetupText(text, SetupSource.CLIPBOARD)) clearClipboard(clipboard)
+    }
+
+    /**
+     * アプリ内でQRを読み取る（Google Code Scanner）。読み取り画面は Google Play 開発者サービス側が
+     * 出すので、このアプリにカメラ権限は要らない。読めた文字列はクリップボードを通さず
+     * そのまま `applySetupText` へ渡す（コピーしないので消す必要もない）。
+     *
+     * 紐づけ済み・送信中は何もしない。キャンセルされたら何も変えない。
+     * スキャン画面のモジュールが未取得なら取得を依頼し、もう一度押してもらう。
+     */
+    private fun scanQr() {
+        if (config.isBound()) return
+        if (inFlight.get()) {
+            setupStatusText.text = BUSY_MESSAGE
             return
         }
-        if (prefillFromUri(url, password)) clearClipboard(clipboard)
+        if (scanning) return
+        val scanner = try {
+            val options = GmsBarcodeScannerOptions.Builder()
+                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                .build()
+            GmsBarcodeScanning.getClient(activity, options)
+        } catch (_: Exception) {
+            setupStatusText.text = SCAN_UNAVAILABLE_MESSAGE
+            return
+        }
+        val task = try {
+            scanner.startScan()
+        } catch (_: Exception) {
+            requestScannerModule(scanner)
+            return
+        }
+        scanning = true
+        task.addOnSuccessListener { barcode -> applySetupText(barcode.rawValue, SetupSource.SCAN) }
+            .addOnFailureListener { e -> handleScanFailure(scanner, e) }
+            .addOnCompleteListener { scanning = false }  // キャンセル時もここに来る
+    }
+
+    /** 読み取り失敗の扱い。例外のメッセージは表示しない（決まった案内文だけを出す）。 */
+    private fun handleScanFailure(scanner: GmsBarcodeScanner, e: Exception) {
+        when (SetupFill.classifyScanError((e as? MlKitException)?.errorCode)) {
+            SetupFill.ScanFailure.CANCELLED, SetupFill.ScanFailure.IN_PROGRESS -> Unit
+            SetupFill.ScanFailure.PLAY_SERVICES_OLD -> setupStatusText.text =
+                "Google Play開発者サービスが古いため読み取れません。更新するか、「クリップボードから読み込む」を使ってください"
+            SetupFill.ScanFailure.CAMERA_DENIED -> setupStatusText.text =
+                "カメラを使えないため読み取れません。Google Play開発者サービスにカメラを許可するか、「クリップボードから読み込む」を使ってください"
+            SetupFill.ScanFailure.OTHER -> setupStatusText.text = SCAN_RETRY_MESSAGE
+            SetupFill.ScanFailure.MODULE_MISSING -> requestScannerModule(scanner)
+        }
+    }
+
+    /**
+     * スキャン画面のモジュールを Google Play 開発者サービスに取得してもらう。
+     * マニフェストの `com.google.mlkit.vision.DEPENDENCIES` は Play ストア経由のインストールでしか
+     * 効かないため、APKを手動で入れた端末では初回にここを通る。取得が終わったら案内を出し直す。
+     * Play 開発者サービスがない端末では取得自体が失敗するので、クリップボードへ案内する。
+     */
+    private fun requestScannerModule(scanner: GmsBarcodeScanner) {
+        val client = try {
+            ModuleInstall.getClient(activity)
+        } catch (_: Exception) {
+            setupStatusText.text = SCAN_UNAVAILABLE_MESSAGE
+            return
+        }
+        val listener = object : InstallStatusListener {
+            override fun onInstallStatusUpdated(update: ModuleInstallStatusUpdate) {
+                val state = update.installState
+                val completed = state == ModuleInstallStatusUpdate.InstallState.STATE_COMPLETED
+                val ended = completed ||
+                    state == ModuleInstallStatusUpdate.InstallState.STATE_FAILED ||
+                    state == ModuleInstallStatusUpdate.InstallState.STATE_CANCELED
+                if (!ended) return
+                client.unregisterListener(this)
+                activity.runOnUiThread {
+                    // 準備中の案内が出たままのときだけ差し替える（その間の別の表示は消さない）
+                    if (setupStatusText.text.toString() == SCAN_PREPARING_MESSAGE) {
+                        setupStatusText.text = if (completed) SCAN_READY_MESSAGE else SCAN_UNAVAILABLE_MESSAGE
+                    }
+                }
+            }
+        }
+        val request = try {
+            ModuleInstallRequest.newBuilder().addApi(scanner).setListener(listener).build()
+        } catch (_: Exception) {
+            setupStatusText.text = SCAN_UNAVAILABLE_MESSAGE
+            return
+        }
+        setupStatusText.text = SCAN_PREPARING_MESSAGE
+        client.installModules(request)
+            .addOnSuccessListener { response ->
+                if (response.areModulesAlreadyInstalled()) {
+                    // モジュールはあるのに開けなかった。取得待ちではないので案内を変える
+                    client.unregisterListener(listener)
+                    setupStatusText.text = SCAN_RETRY_MESSAGE
+                }
+            }
+            .addOnFailureListener {
+                client.unregisterListener(listener)
+                setupStatusText.text = SCAN_UNAVAILABLE_MESSAGE
+            }
     }
 
     private fun clearClipboard(clipboard: ClipboardManager?) {
@@ -576,6 +701,14 @@ class ChallengePanel(
         private const val BUSY_MESSAGE = "送信中です。終わるまでお待ちください"
         private const val NOT_SAVED_MESSAGE = "端末の空きがなく未送信にも保存できていません"
         private const val QUEUE_UPDATE_FAILED = "端末の空きがなく未送信の一覧を更新できませんでした"
+        private const val SCAN_PREPARING_MESSAGE =
+            "読み取り機能を準備しています。少し待ってからもう一度押してください"
+        private const val SCAN_READY_MESSAGE =
+            "読み取りの準備ができました。もう一度「QRを読み取る」を押してください"
+        private const val SCAN_RETRY_MESSAGE =
+            "読み取りを開始できませんでした。もう一度押すか、「クリップボードから読み込む」を使ってください"
+        private const val SCAN_UNAVAILABLE_MESSAGE =
+            "この端末ではQRの読み取りを使えません。「クリップボードから読み込む」を使ってください"
         private const val INVALID_URL_MESSAGE =
             "URLは https://script.google.com/macros/s/ で始まる記録APIのURLを入力してください"
     }
