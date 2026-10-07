@@ -25,6 +25,9 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import java.io.File
 
+/** F15 のアカウント選択画面の結果を見分ける番号（100 はストレージ権限で使用中） */
+private const val REQ_CHOOSE_ACCOUNT = 201
+
 class MainActivity : Activity(), FillEngine.Listener {
 
     private lateinit var donutChart: DonutChartView
@@ -36,6 +39,8 @@ class MainActivity : Activity(), FillEngine.Listener {
     private lateinit var stopButton: Button
     private lateinit var deviceInfoText: TextView
     private lateinit var permissionStatusText: TextView
+    private lateinit var googleAccountText: TextView
+    private lateinit var googleAccounts: GoogleAccounts
     private lateinit var permissionButton: Button
     private lateinit var dummyListContainer: LinearLayout
     private lateinit var dummyHeader: TextView
@@ -121,6 +126,8 @@ class MainActivity : Activity(), FillEngine.Listener {
         stopButton = findViewById(R.id.stopButton)
         deviceInfoText = findViewById(R.id.deviceInfoText)
         permissionStatusText = findViewById(R.id.permissionStatusText)
+        googleAccountText = findViewById(R.id.googleAccountText)
+        googleAccounts = GoogleAccounts(this)
         permissionButton = findViewById(R.id.permissionButton)
         dummyListContainer = findViewById(R.id.dummyListContainer)
         dummyHeader = findViewById(R.id.dummyHeader)
@@ -158,6 +165,7 @@ class MainActivity : Activity(), FillEngine.Listener {
         findViewById<Button>(R.id.rescanButton).setOnClickListener { startScan(force = true) }
         findViewById<Button>(R.id.deleteAllButton).setOnClickListener { deleteAll() }
         permissionButton.setOnClickListener { requestStoragePermission() }
+        findViewById<Button>(R.id.googleAccountButton).setOnClickListener { chooseGoogleAccount() }
         catchButton.setOnClickListener { catchPokemon() }
         updateCheckButton.setOnClickListener { checkForUpdate() }
         updateInstallButton.setOnClickListener { downloadAndInstall() }
@@ -181,6 +189,7 @@ class MainActivity : Activity(), FillEngine.Listener {
         super.onResume()
         handler.post(uptimeTicker)
         updateDeviceInfo()
+        updateGoogleAccount()
         updatePermissionStatus()
     }
 
@@ -210,14 +219,11 @@ class MainActivity : Activity(), FillEngine.Listener {
      */
     private fun handleIncomingIntent() {
         val uri = intent.data ?: return
-        if (SetupLink.isSetupUri(uri)) {
-            challengePanelController.prefillFromUri(
-                uri.getQueryParameter("url"),
-                uri.getQueryParameter("password")
-            )
-            showPanel(true)
-            intent.data = null
-        }
+        // 判定と取り出しはクリップボード・QR読み取りと同じ SetupLink に任せる
+        val (url, password) = SetupLink.fromUri(uri) ?: return
+        challengePanelController.prefillFromUri(url, password)
+        showPanel(true)
+        intent.data = null
     }
 
     /** 起動時は従来どおり容量管理を表示する。書き込み中でもパネル切替で処理は止めない。 */
@@ -586,6 +592,33 @@ class MainActivity : Activity(), FillEngine.Listener {
             appendLine("CPU: ${DeviceInfo.cpu()}")
             append("RAM: ${DeviceInfo.formatBytes(DeviceInfo.ramTotal(this@MainActivity))}")
         }
+    }
+
+    /** F15: 選んだGoogleアカウントを表示する。端末から消えていたらその旨を添える。 */
+    private fun updateGoogleAccount() {
+        googleAccountText.text = GoogleAccounts.label(googleAccounts.saved(), googleAccounts.presentNames())
+    }
+
+    private fun chooseGoogleAccount() {
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(
+                GoogleAccounts.chooseIntent(googleAccounts.saved().firstOrNull()?.name),
+                REQ_CHOOSE_ACCOUNT
+            )
+        } catch (e: Exception) {
+            googleAccountText.text = "Googleアカウント: 選択画面を開けませんでした"
+        }
+    }
+
+    @Deprecated("Activity の標準API。androidx を使わないためこちらを使う")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQ_CHOOSE_ACCOUNT) return
+        // キャンセルなら何も変えない
+        if (resultCode == RESULT_OK) GoogleAccounts.nameFromResult(data)?.let { googleAccounts.replaceWith(it) }
+        updateGoogleAccount()
     }
 
     private fun hasStoragePermission(): Boolean = when {

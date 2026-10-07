@@ -11,7 +11,8 @@ import java.net.URL
  */
 object ChallengeApi {
 
-    private const val TIMEOUT_MS = 20000
+    // Apps Script はしばらく呼ばれていないと起動に時間がかかり、20秒では足りないことがあった（2026-10-06 ユーザー判断で40秒）
+    private const val TIMEOUT_MS = 40000
 
     data class Result(
         val ok: Boolean,

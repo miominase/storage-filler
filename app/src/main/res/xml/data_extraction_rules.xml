@@ -4,14 +4,17 @@
      SharedPreferences がそのまま移る。紐づけ（URL・共通パスワード・端末ID）と未送信キューは
      端末ごとのものなので、どちらの経路でも持ち出さない。
      - challenge.xml: ChallengeConfig の SharedPreferences（"challenge"）
-     - pending_records.json: PendingRecords.FILE_NAME -->
+     - pending_records.json: PendingRecords.FILE_NAME
+     - google_accounts.xml: GoogleAccounts の SharedPreferences（F15。端末ごとのアカウント） -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="challenge.xml" />
         <exclude domain="file" path="pending_records.json" />
+        <exclude domain="sharedpref" path="google_accounts.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="challenge.xml" />
         <exclude domain="file" path="pending_records.json" />
+        <exclude domain="sharedpref" path="google_accounts.xml" />
     </device-transfer>
 </data-extraction-rules>

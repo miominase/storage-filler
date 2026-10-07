@@ -3,6 +3,7 @@ package jp.own.storagefiller;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 import com.google.mlkit.common.MlKitException;
 
@@ -78,5 +79,15 @@ public class SetupFillTest {
                 F.classifyScanError(MlKitException.CODE_SCANNER_PIPELINE_INITIALIZATION_ERROR));
         assertEquals(SetupFill.ScanFailure.OTHER,
                 F.classifyScanError(MlKitException.CODE_SCANNER_APP_NAME_UNAVAILABLE));
+    }
+
+    @Test
+    public void clipboardIsClearedWheneverItHeldSetupContent() {
+        // パスワード入りの内容は、欄に入れられなかった（不正なURL）ときもクリップボードから消す
+        assertTrue(F.shouldClearClipboard(F.plan(URL, "dummypass")));
+        assertTrue(F.shouldClearClipboard(F.plan("https://evil.example/exec", "dummypass")));
+        assertTrue(F.shouldClearClipboard(F.plan(null, "dummypass")));
+        // 設定用の内容が無かったときは、関係ないクリップボードを消さない
+        assertFalse(F.shouldClearClipboard(F.plan(null, null)));
     }
 }

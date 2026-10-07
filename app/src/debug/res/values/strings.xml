@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 試験版（debug ビルド、アプリID jp.own.storagefiller.debug）だけの表示名。正式版と見分けるため -->
+<resources>
+    <string name="app_name">容量埋めテスト(debug)</string>
+</resources>

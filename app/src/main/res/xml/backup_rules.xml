@@ -3,8 +3,10 @@
      バックアップが有効な環境や adb backup 経由でも紐づけ（パスワードを含む）と未送信キューを
      持ち出さないよう明示的に除外しておく。
      - challenge.xml: ChallengeConfig の SharedPreferences（"challenge"）
-     - pending_records.json: PendingRecords.FILE_NAME -->
+     - pending_records.json: PendingRecords.FILE_NAME
+     - google_accounts.xml: GoogleAccounts の SharedPreferences（F15。端末ごとのアカウント） -->
 <full-backup-content>
     <exclude domain="sharedpref" path="challenge.xml" />
     <exclude domain="file" path="pending_records.json" />
+    <exclude domain="sharedpref" path="google_accounts.xml" />
 </full-backup-content>

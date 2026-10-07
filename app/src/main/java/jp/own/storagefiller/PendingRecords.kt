@@ -25,6 +25,11 @@ class PendingRecords(private val file: File) {
 
     private val lock: Any = lockFor(file)
 
+    init {
+        // 前回の書き込み途中で落ちたときの一時ファイルを掃除する（中身は端末IDとメモ）
+        synchronized(lock) { removeStaleTemps() }
+    }
+
     /**
      * 表示や再送対象の取得用。読めなければ空として扱う（表示が消えるだけで、ファイルには触れない）。
      */
@@ -84,6 +89,8 @@ class PendingRecords(private val file: File) {
      * Android実機では最初のrenameToが必ず成功するので、このフォールバックは通らない。
      */
     private fun write(list: List<ChallengeRecord>) {
+        // ロックの内側なので、ここで見つかる一時ファイルは落ちた書き込みの残りだけ
+        removeStaleTemps()
         if (list.isEmpty()) {
             file.delete()
             return
@@ -102,6 +109,20 @@ class PendingRecords(private val file: File) {
         } catch (e: Exception) {
             tmp?.delete()
             throw e
+        }
+    }
+
+    /**
+     * `createTempFile(file.name, ".tmp", dir)` が作る名前（`pending_records.json<数字>.tmp`）の
+     * 残りを消す。同じプロセスの書き手はロックで1つに絞っているので、呼ぶのはロックの内側だけ。
+     */
+    private fun removeStaleTemps() {
+        val dir = file.absoluteFile.parentFile ?: return
+        val prefix = file.name
+        dir.listFiles()?.forEach {
+            if (it.isFile && it.name.startsWith(prefix) && it.name.endsWith(".tmp") && it.name != prefix) {
+                it.delete()
+            }
         }
     }
 

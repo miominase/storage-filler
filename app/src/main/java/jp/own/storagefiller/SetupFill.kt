@@ -45,6 +45,14 @@ object SetupFill {
         )
     }
 
+    /**
+     * クリップボードから取り込んだあと、クリップボードを空にするか。
+     * 設定用の内容（URLかパスワード）が入っていたら、欄に入れられたかどうかに関係なく消す
+     * （不正なURLで弾いたときもパスワードがキーボードの履歴に残らないように）。
+     * 設定用の内容が無かったときは、関係ないクリップボードなので触らない。
+     */
+    fun shouldClearClipboard(plan: Plan): Boolean = plan != Plan.Empty
+
     /** QR読み取り（Google Code Scanner）が失敗したときの扱い。 */
     enum class ScanFailure {
         /** ユーザーが閉じた。何もしない。 */

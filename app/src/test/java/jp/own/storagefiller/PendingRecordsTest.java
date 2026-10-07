@@ -123,4 +123,45 @@ public class PendingRecordsTest {
         assertFalse(PendingRecords.Companion.needsAttention(""));
         assertFalse(PendingRecords.Companion.needsAttention("NETWORK"));
     }
+
+    private File newDir() throws Exception {
+        File dir = File.createTempFile("pending_dir", "");
+        assertTrue(dir.delete());
+        assertTrue(dir.mkdir());
+        return dir;
+    }
+
+    @Test
+    public void staleTempFilesLeftByACrashAreRemovedOnOpen() throws Exception {
+        // 書き込み途中で落ちると一時ファイルが残る（中身は端末IDとメモ）。次に開いたときに掃除する
+        File dir = newDir();
+        File file = new File(dir, "pending_records.json");
+        File stale = new File(dir, "pending_records.json123456789.tmp");
+        File other = new File(dir, "other.tmp");
+        assertTrue(stale.createNewFile());
+        assertTrue(other.createNewFile());
+        java.nio.file.Files.write(file.toPath(), "[]".getBytes("UTF-8"));
+
+        new PendingRecords(file);
+
+        assertFalse(stale.exists());
+        assertTrue(other.exists());
+        assertTrue(file.exists());
+    }
+
+    @Test
+    public void staleTempFilesAreAlsoRemovedOnWrite() throws Exception {
+        File dir = newDir();
+        File file = new File(dir, "pending_records.json");
+        PendingRecords records = new PendingRecords(file);
+        File stale = new File(dir, "pending_records.json987654321.tmp");
+        assertTrue(stale.createNewFile());
+
+        records.add(record("cccccccc-3333-3333-3333-333333333333"));
+
+        assertFalse(stale.exists());
+        String[] left = dir.list();
+        assertEquals(1, left.length);
+        assertEquals("pending_records.json", left[0]);
+    }
 }

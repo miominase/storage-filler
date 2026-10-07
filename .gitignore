@@ -12,3 +12,7 @@ app/build/
 
 # APKはGitHub Releasesで配布（リポジトリには含めない）
 releases/*.apk
+
+# R8 の対応表は公開しない
+releases/mapping-*.txt
+mapping*.txt

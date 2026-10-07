@@ -21,8 +21,8 @@ android {
         applicationId = "jp.own.storagefiller"
         minSdk = 24
         targetSdk = 35
-        versionCode = 11
-        versionName = "0.8.1"
+        versionCode = 12
+        versionName = "0.8.2"
 
         // アプリ内アップデートの取得元。リポジトリを移す場合はここだけ変える
         buildConfigField("String", "UPDATE_REPO", "\"miominase/storage-filler\"")
@@ -45,9 +45,27 @@ android {
     }
 
     buildTypes {
+        // 試験版は別のアプリIDにして、端末の正式版（リリース鍵で署名）を消さずに横に入れられるようにする。
+        // アプリ名は src/debug/res/values/strings.xml で「(debug)」付きに差し替える。release には影響しない
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
-            isMinifyEnabled = false
+            // R8 で使っていないコード・リソースを削って APK を小さくする（v0.8.2〜、SPEC 非機能要件）。
+            // 縮小後のエラー記録を読むための対応表 build/outputs/mapping/release/mapping.txt は
+            // リリースごとに保管する（KNOWLEDGE.md）。
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (hasReleaseKey) signingConfig = signingConfigs.getByName("release")
+        }
+        // R8 を有効にした release と同じ中身を、debug の鍵で署名して正式版の横に入れて確かめる試験用。
+        // 配布はしない。アプリIDは .r8test、表示名は src/r8test/res で「(R8試験)」付き。
+        create("r8test") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".r8test"
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
         }
     }
 

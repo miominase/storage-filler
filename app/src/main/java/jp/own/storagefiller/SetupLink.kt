@@ -21,19 +21,22 @@ import android.net.Uri
  */
 object SetupLink {
 
+    fun isSetupUri(uri: Uri): Boolean = isSetupTarget(uri.scheme, uri.host, uri.path)
+
     /**
      * URIのscheme・hostは仕様上大文字小文字を区別しない（Androidのインテント解決自体も
-     * 区別しない）ため、ここでも区別しない。pathはそのまま（大文字小文字を区別して）比較する。
+     * 区別しない）ため、ここでも区別しない。pathも、手打ちやQR生成ツールで大文字になった
+     * `/Setup` を弾かないよう区別しない（v0.8.2〜）。
+     * android.net.Uri に触れない純ロジックなので JVM 単体テストで確かめる。
      */
-    fun isSetupUri(uri: Uri): Boolean {
-        val scheme = uri.scheme ?: return false
-        val host = uri.host ?: return false
+    fun isSetupTarget(scheme: String?, host: String?, path: String?): Boolean {
+        if (scheme == null || host == null) return false
         if (scheme.equals("storagefiller", ignoreCase = true) && host.equals("setup", ignoreCase = true)) {
             return true
         }
         return scheme.equals("https", ignoreCase = true) &&
             host.equals("storagefiller.invalid", ignoreCase = true) &&
-            (uri.path ?: "").startsWith("/setup")
+            (path ?: "").startsWith("/setup", ignoreCase = true)
     }
 
     /**
@@ -52,12 +55,17 @@ object SetupLink {
             else -> null
         }
         if (bareQuery != null) {
-            val uri = Uri.Builder().encodedQuery(bareQuery).build()
-            return uri.getQueryParameter("url") to uri.getQueryParameter("password")
+            return extract(Uri.Builder().encodedQuery(bareQuery).build())
         }
-
-        val uri = Uri.parse(trimmed)
-        if (!isSetupUri(uri)) return null
-        return uri.getQueryParameter("url") to uri.getQueryParameter("password")
+        return fromUri(Uri.parse(trimmed))
     }
+
+    /**
+     * VIEWインテントで受け取ったURI（`intent.data`）から (url, password) を取り出す。
+     * 設定用のリンクでなければ null。`MainActivity.handleIncomingIntent` と [parse] の共通の入口。
+     */
+    fun fromUri(uri: Uri): Pair<String?, String?>? = if (isSetupUri(uri)) extract(uri) else null
+
+    private fun extract(uri: Uri): Pair<String?, String?> =
+        uri.getQueryParameter("url") to uri.getQueryParameter("password")
 }

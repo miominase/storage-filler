@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- R8 試験用ビルド（アプリID jp.own.storagefiller.r8test）だけの表示名。正式版と見分けるため -->
+<resources>
+    <string name="app_name">容量埋めテスト(R8試験)</string>
+</resources>

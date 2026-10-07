@@ -159,7 +159,12 @@ class ChallengePanel(
     fun prefillFromUri(url: String?, password: String?): Boolean {
         // 紐づけ済みならこの欄自体が非表示。紐づけを変えたい場合は先に解除してもらう。
         if (config.isBound()) return false
-        return when (val plan = SetupFill.plan(url, password)) {
+        return applyPlan(SetupFill.plan(url, password))
+    }
+
+    /** [prefillFromUri] の本体。判断済みの [plan] を欄へ反映し、何か入れたら true。 */
+    private fun applyPlan(plan: SetupFill.Plan): Boolean {
+        return when (plan) {
             SetupFill.Plan.Empty -> false
             SetupFill.Plan.InvalidUrl -> {
                 setupStatusText.text = INVALID_URL_MESSAGE
@@ -188,24 +193,25 @@ class ChallengePanel(
      *
      * [text] はパスワードそのものを含むので、ステータス表示にもログにも一切出さない。
      *
-     * @return 欄に何か入れたら true
+     * @return 取り込みの判断。紐づけ済み・設定用の内容が無いときは [SetupFill.Plan.Empty]
      */
-    private fun applySetupText(text: String?, source: SetupSource): Boolean {
-        if (config.isBound()) return false
+    private fun applySetupText(text: String?, source: SetupSource): SetupFill.Plan {
+        if (config.isBound()) return SetupFill.Plan.Empty
         val parsed = text?.let { SetupLink.parse(it) }
-        val url = parsed?.first
-        val password = parsed?.second
-        if (url.isNullOrEmpty() && password.isNullOrEmpty()) {
+        val plan = SetupFill.plan(parsed?.first, parsed?.second)
+        if (plan == SetupFill.Plan.Empty) {
             setupStatusText.text = source.emptyMessage
-            return false
+        } else {
+            applyPlan(plan)
         }
-        return prefillFromUri(url, password)
+        return plan
     }
 
     /**
      * クリップボードのテキストをQRの内容として読み込む。Google Play 開発者サービスがなく
      * 「QRを読み取る」が使えない端末向けの予備の入口（標準カメラで読んで「コピー」してもらう）。
-     * 読み込めたらクリップボードを空にする（キーボードのクリップボード履歴に残さないため）。
+     * 設定用の内容だったらクリップボードを空にする（キーボードのクリップボード履歴に残さないため）。
+     * 不正なURLで欄に入れなかったときも、パスワードが含まれうるので消す。
      */
     private fun importFromClipboard() {
         if (config.isBound()) return
@@ -216,7 +222,8 @@ class ChallengePanel(
         } else {
             null
         }
-        if (applySetupText(text, SetupSource.CLIPBOARD)) clearClipboard(clipboard)
+        // パスワード入りの内容は、不正なURLで欄に入れなかったときも消す
+        if (SetupFill.shouldClearClipboard(applySetupText(text, SetupSource.CLIPBOARD))) clearClipboard(clipboard)
     }
 
     /**
@@ -385,11 +392,14 @@ class ChallengePanel(
         AlertDialog.Builder(activity)
             .setMessage("この端末の紐づけを解除しますか？\n未送信の記録は残ります。")
             .setPositiveButton("解除") { _, _ ->
-                config.unbind()
-                urlInput.setText("")
-                passwordInput.setText("")
-                deviceIdInput.setText("")
-                render()
+                // ダイアログを開いてから押すまでに送信が始まっていたら解除しない
+                val done = Exclusive.tryRun(inFlight) {
+                    config.unbind()
+                    urlInput.setText("")
+                    passwordInput.setText("")
+                    deviceIdInput.setText("")
+                }
+                if (done) render() else recordStatusText.text = BUSY_MESSAGE
             }
             .setNegativeButton("やめる", null)
             .show()
@@ -679,12 +689,18 @@ class ChallengePanel(
         AlertDialog.Builder(activity)
             .setMessage("この未送信の記録を破棄しますか？\n${record.at}\n${record.result} / ${record.service}")
             .setPositiveButton("破棄") { _, _ ->
-                recordStatusText.text = try {
-                    pending.remove(record.id)
-                    "未送信の記録を破棄しました"
-                } catch (_: IOException) {
-                    "破棄できませんでした（端末の空きが不足しています）"
+                // ダイアログを開いてから押すまでに自動再送が始まっていたら、破棄した記録が
+                // 届いてしまう。確定の時点でも送信中フラグを取り、取れなければ破棄しない。
+                var message = BUSY_MESSAGE
+                Exclusive.tryRun(inFlight) {
+                    message = try {
+                        pending.remove(record.id)
+                        "未送信の記録を破棄しました"
+                    } catch (_: IOException) {
+                        "破棄できませんでした（端末の空きが不足しています）"
+                    }
                 }
+                recordStatusText.text = message
                 renderPending()
             }
             .setNegativeButton("やめる", null)
