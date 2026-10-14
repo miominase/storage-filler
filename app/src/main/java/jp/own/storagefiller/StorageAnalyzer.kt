@@ -39,13 +39,13 @@ object StorageAnalyzer {
     }
 
     /**
-     * @param excludeDir ダミーデータの保存先。円グラフでは既存データと別セグメントに分けるため集計から除く
+     * @param excludeDirs ダミーデータの保存先（v0.9.0〜 複数）。円グラフでは既存データと別セグメントに分けるため集計から除く
      */
-    fun scan(excludeDir: File?, onProgress: (scannedFiles: Long) -> Unit): Result {
+    fun scan(excludeDirs: List<File>, onProgress: (scannedFiles: Long) -> Unit): Result {
         cancelled = false
         val root = Environment.getExternalStorageDirectory()
         val stat = StatFs(root.absolutePath)
-        val excludePath = excludeDir?.absolutePath
+        val excludePaths = excludeDirs.map { it.absolutePath }.toSet()
         val counts = HashMap<String, Long>().also { m -> CATEGORIES.forEach { m[it] = 0L } }
         var scanned = 0L
 
@@ -63,7 +63,7 @@ object StorageAnalyzer {
                 if (cancelled) break
                 try {
                     if (f.isDirectory) {
-                        if (f.absolutePath != excludePath) stack.add(f)
+                        if (f.absolutePath !in excludePaths) stack.add(f)
                     } else {
                         val cat = categorize(f, root)
                         counts[cat] = (counts[cat] ?: 0L) + f.length()

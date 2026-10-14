@@ -342,9 +342,10 @@ class MainActivity : Activity(), FillEngine.Listener {
         findViewById<Button>(R.id.size50gb).setOnClickListener { startFill(50L shl 30) }
     }
 
+    /** 割合は「空き − 200MB」に対する割合（v0.9.0〜） */
     private fun ratioToBytes(ratio: Double): Long {
         val (free, _) = DeviceInfo.storage()
-        return (free * ratio).toLong()
+        return FillPlan.ratioTarget(free, ratio)
     }
 
     // ---- 埋め込み ----
@@ -362,9 +363,13 @@ class MainActivity : Activity(), FillEngine.Listener {
             return
         }
         val (free, _) = DeviceInfo.storage()
-        val target = requested.coerceAtMost(free)
+        // 書き込み後も 200MB は残す。固定サイズもここで上限に切る
+        val target = FillPlan.capTarget(requested, free)
         if (target <= 0) {
-            appendLog("埋め対象容量が 0 です")
+            appendLog(
+                "埋め対象容量が 0 です（空き ${DeviceInfo.formatBytes(free)}。" +
+                    "${DeviceInfo.formatBytes(FillPlan.RESERVE_BYTES)} は残します）"
+            )
             return
         }
 
@@ -403,7 +408,7 @@ class MainActivity : Activity(), FillEngine.Listener {
         scanning = true
         statusText.text = "計測中..."
         Thread {
-            val result = StorageAnalyzer.scan(engine.baseDir()) { scanned ->
+            val result = StorageAnalyzer.scan(engine.dummyDirs()) { scanned ->
                 runOnUiThread { statusText.text = "計測中... ${scanned}ファイル" }
             }
             scanning = false
@@ -417,8 +422,8 @@ class MainActivity : Activity(), FillEngine.Listener {
 
     private fun dummyBytes(): Long {
         var sum = 0L
-        for (p in FillLog(this).paths()) {
-            val f = File(p)
+        for (e in FillLog(this).entries()) {
+            val f = File(e.path)
             if (f.exists()) sum += f.length()
         }
         return sum
@@ -494,9 +499,9 @@ class MainActivity : Activity(), FillEngine.Listener {
 
     private fun refreshDummyList() {
         dummyListContainer.removeAllViews()
-        val paths = FillLog(this).paths()
-        updateDummyHeader(paths.size, dummyBytes())
-        if (paths.isEmpty()) {
+        val entries = FillLog(this).entries()
+        updateDummyHeader(entries.size, dummyBytes())
+        if (entries.isEmpty()) {
             val empty = TextView(this).apply {
                 text = "作成済みデータはありません"
                 setTextColor(color(R.color.pixel_shadow))
@@ -507,14 +512,16 @@ class MainActivity : Activity(), FillEngine.Listener {
             dummyListContainer.addView(empty)
             return
         }
-        for (path in paths) {
-            val f = File(path)
+        for (entry in entries) {
+            val f = File(entry.path)
+            // 旧形式の行はカテゴリ列が無いので、今までどおり親フォルダ名から出す
+            val category = entry.category ?: f.parentFile?.name ?: ""
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setPadding(8, 4, 8, 4)
             }
             val label = TextView(this).apply {
-                text = "[${categoryLabel(f.parentFile?.name ?: "")}] ${f.name}\n" +
+                text = "[${categoryLabel(category)}] ${f.name}\n" +
                     DeviceInfo.formatBytes(if (f.exists()) f.length() else 0)
                 setTextColor(color(R.color.pixel_ink))
                 textSize = 12f
@@ -527,7 +534,7 @@ class MainActivity : Activity(), FillEngine.Listener {
                 textSize = 14f
                 typeface = pixelFontBold
                 setPadding(24, 8, 24, 8)
-                setOnClickListener { deleteOne(path) }
+                setOnClickListener { deleteOne(entry) }
             }
             row.addView(label)
             row.addView(delete)
@@ -535,13 +542,13 @@ class MainActivity : Activity(), FillEngine.Listener {
         }
     }
 
-    private fun deleteOne(path: String) {
+    private fun deleteOne(entry: FillPlan.LogEntry) {
         if (engine.isRunning) return
         Thread {
-            val f = File(path)
+            val f = File(entry.path)
             val size = if (f.exists()) f.length() else 0L
-            val deleted = f.delete()
-            FillLog(this).remove(path)
+            val deleted = f.exists() && engine.delete(entry)
+            FillLog(this).remove(entry.path)
             runOnUiThread {
                 appendLog(
                     if (deleted) "削除: ${f.name} (${DeviceInfo.formatBytes(size)})"
@@ -560,19 +567,16 @@ class MainActivity : Activity(), FillEngine.Listener {
         }
         Thread {
             val log = FillLog(this)
-            val paths = log.paths()
             var freed = 0L
             var deleted = 0
-            for (path in paths) {
-                val f = File(path)
-                if (f.exists()) {
-                    freed += f.length()
-                    if (f.delete()) deleted++
+            for (entry in log.entries()) {
+                val size = File(entry.path).length()
+                if (engine.delete(entry)) {
+                    freed += size
+                    deleted++
                 }
             }
-            val base = engine.baseDir()
-            for (category in FillEngine.CATEGORIES) File(base, category).delete()
-            base.delete()
+            engine.removeEmptyDirs()
             log.clear()
             runOnUiThread {
                 appendLog("全削除完了: ${deleted}件 / 解放 ${DeviceInfo.formatBytes(freed)}")
@@ -623,7 +627,6 @@ class MainActivity : Activity(), FillEngine.Listener {
 
     private fun hasStoragePermission(): Boolean = when {
         Build.VERSION.SDK_INT >= 30 -> Environment.isExternalStorageManager()
-        Build.VERSION.SDK_INT == 29 -> true // アプリ専用外部領域を使うため不要
         else -> checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
             PackageManager.PERMISSION_GRANTED
     }
@@ -646,7 +649,6 @@ class MainActivity : Activity(), FillEngine.Listener {
                 intent.data = Uri.parse("package:$packageName")
                 startActivity(intent)
             }
-            Build.VERSION.SDK_INT == 29 -> updatePermissionStatus()
             else -> requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 100)
         }
     }
@@ -830,11 +832,14 @@ class MainActivity : Activity(), FillEngine.Listener {
         runOnUiThread {
             val pct = if (targetBytes > 0) (writtenBytes * 100 / targetBytes).toInt() else 0
             statusText.text = "書き込み中: $pct%"
-            progressText.text = "%s / %s  %.1f MB/s  %dファイル".format(
+            val line = "%s / %s  %.1f MB/s  %dファイル".format(
                 DeviceInfo.formatBytes(writtenBytes),
                 DeviceInfo.formatBytes(targetBytes),
                 speedMBps, fileCount
             )
+            // 残り時間は平均速度から出す。速度が出るまでは表示しない
+            val eta = FillPlan.etaText(writtenBytes, targetBytes, speedMBps)
+            progressText.text = if (eta == null) line else "$line  $eta"
             // 円グラフも書込に連動させる。FillEngine 側で 100ms に間引かれている
             liveWritten = writtenBytes
             updateStats()
