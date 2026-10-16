@@ -17,14 +17,17 @@ class ChallengeConfig(context: Context) {
     val deviceId: String get() = prefs.getString(KEY_DEVICE_ID, "") ?: ""
     val deviceName: String get() = prefs.getString(KEY_DEVICE_NAME, "") ?: ""
 
+    val accountId: String get() = prefs.getString(KEY_ACCOUNT_ID, "") ?: ""
+
     fun isBound(): Boolean = apiUrl.isNotEmpty() && password.isNotEmpty() && deviceId.isNotEmpty()
 
-    fun save(url: String, password: String, deviceId: String, deviceName: String) {
+    fun save(url: String, password: String, deviceId: String, deviceName: String, accountId: String) {
         prefs.edit()
             .putString(KEY_URL, url.trim())
             .putString(KEY_PASSWORD, password)
             .putString(KEY_DEVICE_ID, deviceId.trim())
             .putString(KEY_DEVICE_NAME, deviceName)
+            .putString(KEY_ACCOUNT_ID, accountId)
             .apply()
     }
 
@@ -38,5 +41,6 @@ class ChallengeConfig(context: Context) {
         const val KEY_PASSWORD = "password"
         const val KEY_DEVICE_ID = "device_id"
         const val KEY_DEVICE_NAME = "device_name"
+        const val KEY_ACCOUNT_ID = "account_id"
     }
 }

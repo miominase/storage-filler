@@ -19,18 +19,39 @@ object ChallengeApi {
         val code: String = "",
         val message: String = "",
         val deviceName: String = "",
-        val duplicate: Boolean = false
+        val duplicate: Boolean = false,
+        val accountId: String = "",
+        val lineLeft: Int? = null,
+        val googleLeft: Int? = null
     )
 
-    fun verify(url: String, password: String, deviceId: String): Result {
+    fun verify(url: String, password: String, deviceId: String, accountId: String): Result =
+        post(url, verifyBody(password, deviceId, accountId))
+
+    /** verify の送信本文。accountId が空のときは古い動作どおりキーごと送らない。 */
+    fun verifyBody(password: String, deviceId: String, accountId: String): JSONObject {
         val body = JSONObject()
             .put("action", "verify")
             .put("deviceId", deviceId)
             .put("password", password)
+        if (accountId.isNotEmpty()) body.put("accountId", accountId)
+        return body
+    }
+
+    /** アカウントの残り回数だけを確かめる。 */
+    fun account(url: String, password: String, accountId: String): Result {
+        val body = JSONObject()
+            .put("action", "account")
+            .put("password", password)
+            .put("accountId", accountId)
         return post(url, body)
     }
 
-    fun send(url: String, password: String, record: ChallengeRecord): Result {
+    fun send(url: String, password: String, record: ChallengeRecord): Result =
+        post(url, recordBody(password, record))
+
+    /** record の送信本文。 */
+    fun recordBody(password: String, record: ChallengeRecord): JSONObject {
         // 端末内の管理用フィールド（status/lastError）は送らない
         val payload = JSONObject()
             .put("id", record.id)
@@ -40,11 +61,14 @@ object ChallengeApi {
             .put("result", record.result)
             .put("service", record.service)
             .put("memo", record.memo)
+        // 古いサーバー・古い記録と同じ形に保つため、空・falseのときはキーごと省く
+        if (record.accountId.isNotEmpty()) payload.put("accountId", record.accountId)
+        if (record.overUse) payload.put("overUse", true)
         val body = JSONObject()
             .put("action", "record")
             .put("password", password)
             .put("record", payload)
-        return post(url, body)
+        return body
     }
 
     private fun post(url: String, body: JSONObject): Result {
@@ -75,18 +99,25 @@ object ChallengeApi {
     /** 応答本文の解析だけを切り出した純関数。 */
     fun parse(bodyText: String): Result = try {
         val o = JSONObject(bodyText)
+        // エラー応答にも account が付くことがある
+        val acc = o.optJSONObject("account")
+        val accountId = acc?.optString("id") ?: ""
+        val lineLeft = acc?.takeIf { it.has("lineLeft") }?.optInt("lineLeft")
+        val googleLeft = acc?.takeIf { it.has("googleLeft") }?.optInt("googleLeft")
         if (o.optBoolean("ok")) {
             Result(
                 ok = true,
                 deviceName = o.optString("deviceName"),
-                duplicate = o.optBoolean("duplicate")
+                duplicate = o.optBoolean("duplicate"),
+                accountId = accountId, lineLeft = lineLeft, googleLeft = googleLeft
             )
         } else {
             val error = o.optJSONObject("error")
             Result(
                 ok = false,
                 code = error?.optString("code") ?: "SERVER",
-                message = error?.optString("message") ?: "サーバーから不明な応答が返りました"
+                message = error?.optString("message") ?: "サーバーから不明な応答が返りました",
+                accountId = accountId, lineLeft = lineLeft, googleLeft = googleLeft
             )
         }
     } catch (_: Exception) {

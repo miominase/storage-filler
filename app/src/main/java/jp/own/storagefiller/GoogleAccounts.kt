@@ -81,6 +81,15 @@ class GoogleAccounts(private val context: Context) {
             }
         }
 
+        private val ACCOUNT_ID = Regex("^[a-z0-9][a-z0-9.]{0,63}$")
+
+        /** メールの @ より前を trim・小文字にしたアカウントID。形が不正なら null（メール全体は送らない）。 */
+        fun accountIdOf(email: String): String? {
+            val at = email.indexOf('@')
+            if (at < 0) return null
+            return email.substring(0, at).trim().lowercase().takeIf { ACCOUNT_ID.matches(it) }
+        }
+
         /** 画面に出す1行。present が null のときは端末にあるかを確かめない。 */
         fun label(saved: List<Entry>, present: Set<String>?): String {
             val first = saved.firstOrNull() ?: return "Googleアカウント: 未選択"

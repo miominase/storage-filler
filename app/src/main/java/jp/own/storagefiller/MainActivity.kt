@@ -147,7 +147,10 @@ class MainActivity : Activity(), FillEngine.Listener {
 
         buildSetupList()
         applyPixelFont(findViewById(android.R.id.content))
-        challengePanelController = ChallengePanel(this, challengePanel, pixelFont, pixelFontBold)
+        challengePanelController = ChallengePanel(this, challengePanel, pixelFont, pixelFontBold) { onChosen ->
+            accountChosen = onChosen
+            chooseGoogleAccount()
+        }
         donutChart.setTypeface(pixelFontBold)
 
         setupChips()
@@ -603,6 +606,9 @@ class MainActivity : Activity(), FillEngine.Listener {
         googleAccountText.text = GoogleAccounts.label(googleAccounts.saved(), googleAccounts.presentNames())
     }
 
+    /** F16: チャレンジ記録パネルから選択画面を開いたときの受け取り先。F15 のボタンから開いたときは null。 */
+    private var accountChosen: ((String) -> Unit)? = null
+
     private fun chooseGoogleAccount() {
         try {
             @Suppress("DEPRECATION")
@@ -611,6 +617,7 @@ class MainActivity : Activity(), FillEngine.Listener {
                 REQ_CHOOSE_ACCOUNT
             )
         } catch (e: Exception) {
+            accountChosen = null
             googleAccountText.text = "Googleアカウント: 選択画面を開けませんでした"
         }
     }
@@ -620,9 +627,13 @@ class MainActivity : Activity(), FillEngine.Listener {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != REQ_CHOOSE_ACCOUNT) return
+        val onChosen = accountChosen
+        accountChosen = null
         // キャンセルなら何も変えない
-        if (resultCode == RESULT_OK) GoogleAccounts.nameFromResult(data)?.let { googleAccounts.replaceWith(it) }
+        val name = if (resultCode == RESULT_OK) GoogleAccounts.nameFromResult(data) else null
+        name?.let { googleAccounts.replaceWith(it) }
         updateGoogleAccount()
+        if (name != null) onChosen?.invoke(name)
     }
 
     private fun hasStoragePermission(): Boolean = when {

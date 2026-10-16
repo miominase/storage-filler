@@ -37,12 +37,15 @@ class ChallengePanel(
     private val activity: Activity,
     root: View,
     private val pixelFont: Typeface,
-    private val pixelFontBold: Typeface
+    private val pixelFontBold: Typeface,
+    /** F16: Google アカウントの選択画面を開き、選ばれたメールアドレスを渡してもらう（キャンセル時は呼ばれない）。 */
+    private val chooseAccount: (onChosen: (String) -> Unit) -> Unit
 ) {
     private val config = ChallengeConfig(activity)
     private val pending = PendingRecords(activity)
 
     private val boundDeviceText: TextView = root.findViewById(R.id.boundDeviceText)
+    private val accountLeftText: TextView = root.findViewById(R.id.accountLeftText)
     private val setupBox: View = root.findViewById(R.id.setupBox)
     private val urlInput: EditText = root.findViewById(R.id.urlInput)
     private val passwordInput: EditText = root.findViewById(R.id.passwordInput)
@@ -89,6 +92,7 @@ class ChallengePanel(
         render()
         if (config.isBound()) {
             fillHoursFromUptime()
+            refreshAccountLeft()
             resendPending()
         }
     }
@@ -99,7 +103,132 @@ class ChallengePanel(
         recordBox.visibility = if (bound) View.VISIBLE else View.GONE
         boundDeviceText.text =
             if (bound) "${config.deviceName}（ID: ${config.deviceId}）" else "まだ紐づけされていません"
+        accountLeftText.visibility = if (bound) View.VISIBLE else View.GONE
+        if (bound && config.accountId.isEmpty()) showAccountLeft(null, null)
         renderPending()
+    }
+
+    // ---- アカウントの残り回数（F16） ----
+
+    private fun showAccountLeft(lineLeft: Int?, googleLeft: Int?) {
+        accountLeftText.text = AccountUsage.leftLabel(config.accountId, lineLeft, googleLeft)
+    }
+
+    /** 応答が今の結び付けアカウントのものなら残りを更新する。他アカウントの記録の再送では触らない。 */
+    private fun showAccountLeftFrom(response: ChallengeApi.Result) {
+        if (response.accountId.isNotEmpty() && response.accountId == config.accountId) {
+            showAccountLeft(response.lineLeft, response.googleLeft)
+        }
+    }
+
+    /**
+     * 画面を開いたときに残りを問い合わせる。読むだけなので送信中フラグは取らない。
+     * 通信の失敗は ChallengeApi が Result にして返す（例外は出ない）。
+     */
+    private fun refreshAccountLeft() {
+        val accountId = config.accountId
+        if (accountId.isEmpty()) return
+        val url = config.apiUrl
+        val password = config.password
+        showAccountLeft(null, null)
+        Thread {
+            val r = ChallengeApi.account(url, password, accountId)
+            activity.runOnUiThread {
+                // 問い合わせ中に紐づけし直していたら古い結果で上書きしない
+                if (config.accountId == accountId) showAccountLeft(r.lineLeft, r.googleLeft)
+            }
+        }.start()
+    }
+
+    /** [email] のアカウントID。未選択・IDにできない名前なら [status] に案内を出して null。 */
+    private fun accountIdOrWarn(email: String?, status: TextView): String? {
+        if (email == null) {
+            status.text = "先に Google アカウントを選んでください"
+            return null
+        }
+        return GoogleAccounts.accountIdOf(email).also {
+            if (it == null) status.text = "このGoogleアカウントはアカウントIDにできません。別のアカウントを選んでください"
+        }
+    }
+
+    /**
+     * アカウント選択画面を開き、選ばれたアカウントで保存済みの URL・パスワード・端末IDのまま紐づけし直す。
+     * 成功したら新しいアカウントIDで [then] を呼ぶ（送信中フラグは戻してあるので、そこから送信を始めてよい）。
+     */
+    private fun rebindWithChosenAccount(then: (String) -> Unit) {
+        chooseAccount { email ->
+            if (!config.isBound()) {
+                recordStatusText.text = "紐づけが解除されたため中止しました"
+                return@chooseAccount
+            }
+            val accountId = accountIdOrWarn(email, recordStatusText) ?: return@chooseAccount
+            if (!inFlight.compareAndSet(false, true)) {
+                recordStatusText.text = BUSY_MESSAGE
+                return@chooseAccount
+            }
+            val url = config.apiUrl
+            val password = config.password
+            val deviceId = config.deviceId
+            recordStatusText.text = "紐づけし直しています..."
+            runInBackground(onError = {
+                recordStatusText.text = "紐づけし直す途中でエラーが起きました。もう一度お試しください"
+            }) {
+                val result = ChallengeApi.verify(url, password, deviceId, accountId)
+                val ui: () -> Unit = {
+                    if (result.ok) {
+                        config.save(url, password, deviceId, result.deviceName, accountId)
+                        render()
+                        // 応答に account が無ければ「確認できません」を出す（古い表示を残さない）
+                        showAccountLeft(result.lineLeft, result.googleLeft)
+                        then(accountId)
+                    } else {
+                        recordStatusText.text = describe(result)
+                    }
+                }
+                ui
+            }
+        }
+    }
+
+    /** 使い切りの応答が来た記録の扱いを選んでもらう（F16）。記録は要確認として未送信に残っている。 */
+    private fun showUsedUpDialog(record: ChallengeRecord) {
+        AlertDialog.Builder(activity)
+            .setMessage(AccountUsage.usedUpMessage(record.accountId, record.service))
+            .setPositiveButton("切り替えて紐づけ直す") { _, _ -> switchAccountAndResend(record) }
+            .setNeutralButton("このまま送る") { _, _ -> confirmOverUse(record) }
+            .setNegativeButton("あとで", null)
+            .show()
+    }
+
+    private fun switchAccountAndResend(record: ChallengeRecord) {
+        rebindWithChosenAccount { newId -> replaceAndResend(AccountUsage.switchedTo(record, newId)) }
+    }
+
+    private fun confirmOverUse(record: ChallengeRecord) {
+        AlertDialog.Builder(activity)
+            .setMessage("使い切ったアカウントのまま送りますか？\n記録は残り、チェックは増えません（「使い切り後に使用」として記録されます）。")
+            .setPositiveButton("このまま送る") { _, _ -> replaceAndResend(record.copy(overUse = true)) }
+            .setNegativeButton("やめる", null)
+            .show()
+    }
+
+    /** 未送信の記録を同じIDのまま差し替えて送り直す。差し替えは送信中フラグを取った中で行う。 */
+    private fun replaceAndResend(record: ChallengeRecord) {
+        var message: String? = BUSY_MESSAGE
+        Exclusive.tryRun(inFlight) {
+            message = try {
+                pending.replace(record)
+                null
+            } catch (_: IOException) {
+                QUEUE_UPDATE_FAILED
+            }
+        }
+        if (message != null) {
+            recordStatusText.text = message
+            return
+        }
+        renderPending()
+        resendOne(record)
     }
 
     /**
@@ -356,6 +485,9 @@ class ChallengePanel(
             setupStatusText.text = INVALID_URL_MESSAGE
             return
         }
+        // F16: 紐づけには F15 で選んだアカウントが要る（端末とアカウントを結び付けるため）
+        val email = GoogleAccounts(activity).saved().firstOrNull()?.name
+        val accountId = accountIdOrWarn(email, setupStatusText) ?: return
         if (!inFlight.compareAndSet(false, true)) {
             setupStatusText.text = BUSY_MESSAGE
             return
@@ -366,14 +498,15 @@ class ChallengePanel(
             bindButton.isEnabled = true
             setupStatusText.text = "確認中にエラーが起きました。もう一度お試しください"
         }) {
-            val result = ChallengeApi.verify(url, password, deviceId)
+            val result = ChallengeApi.verify(url, password, deviceId, accountId)
             val ui: () -> Unit = {
                 bindButton.isEnabled = true
                 if (result.ok) {
-                    config.save(url, password, deviceId, result.deviceName)
+                    config.save(url, password, deviceId, result.deviceName, accountId)
                     passwordInput.setText("")
                     setupStatusText.text = ""
                     render()
+                    showAccountLeft(result.lineLeft, result.googleLeft)
                     fillHoursFromUptime()
                     resendPending()
                 } else {
@@ -426,13 +559,21 @@ class ChallengePanel(
             recordStatusText.text = "メモは1000文字以内にしてください"
             return
         }
+        // F16: この機能より前に紐づけた端末。記録は作らず、入力はそのまま残して紐づけし直してもらう
+        if (config.accountId.isEmpty()) {
+            recordStatusText.text = "アカウントを選んで紐づけし直してください"
+            rebindWithChosenAccount {
+                recordStatusText.text = "紐づけし直しました。もう一度記録ボタンを押してください"
+            }
+            return
+        }
         // 別の ChallengePanel（回転前の画面など）が送信中なら重ねて送らない
         if (!inFlight.compareAndSet(false, true)) {
             recordStatusText.text = BUSY_MESSAGE
             return
         }
         // 実施日時はここで固定する。通信が遅れても動かさない。
-        val record = ChallengeRecord.create(config.deviceId, hours, result, service, memo)
+        val record = ChallengeRecord.create(config.deviceId, config.accountId, hours, result, service, memo)
         // 送信前に必ず保存する。ここで落ちても記録は消えない。
         // 端末の空きがなくて保存できなくても送信は試みる（送れれば記録は残る）。
         val saved = try {
@@ -465,7 +606,7 @@ class ChallengePanel(
                     if (response.ok) {
                         pending.remove(record.id)
                     } else if (PendingRecords.needsAttention(response.code)) {
-                        pending.markAttention(record.id, describe(response))
+                        pending.markAttention(record.id, describe(response, record))
                     }
                 } catch (_: IOException) {
                     // 消せなければ次回の再送でサーバー側の重複判定に任せる。
@@ -474,15 +615,17 @@ class ChallengePanel(
             }
             val ui: () -> Unit = {
                 setRecordButtonsEnabled(true)
+                showAccountLeftFrom(response)
                 if (response.ok) {
                     if (!saved) resetForm()
                     recordStatusText.text =
                         if (response.duplicate) "記録済みでした（重複なし）" else "記録しました"
                 } else if (!saved) {
                     // 控えが無いので入力欄は残す。もう一度押してもらう必要がある。
-                    recordStatusText.text = "送信できませんでした（${describe(response)}）。$NOT_SAVED_MESSAGE"
+                    recordStatusText.text = "送信できませんでした（${describe(response, record)}）。$NOT_SAVED_MESSAGE"
                 } else if (PendingRecords.needsAttention(response.code)) {
-                    recordStatusText.text = "${describe(response)}（未送信に残しました）"
+                    recordStatusText.text = "${describe(response, record)}（未送信に残しました）"
+                    if (response.code == USED_UP) showUsedUpDialog(record)
                 } else {
                     recordStatusText.text =
                         "未送信として保存しました（${describe(response)}）。自動で送り直すので、もう一度押す必要はありません"
@@ -517,12 +660,14 @@ class ChallengePanel(
         recordFailureButton.isEnabled = enabled
     }
 
-    private fun describe(r: ChallengeApi.Result): String = when (r.code) {
+    /** [record] は使い切りの文言にアカウントIDとサービスを入れるため（未送信一覧の行の見分けにも使う）。 */
+    private fun describe(r: ChallengeApi.Result, record: ChallengeRecord? = null): String = when (r.code) {
         "AUTH" -> "パスワードが違います。紐づけを設定し直してください"
         "DEVICE_NOT_ACTIVE" -> "使用中の端末ではありません（対象外・売却済み）"
         "VALIDATION" -> "入力内容を確認してください: ${r.message}"
         "CONFLICT" -> "同じ記録IDで別の内容が保存済みです"
         "NETWORK" -> "通信できませんでした"
+        USED_UP -> record?.let { AccountUsage.usedUpMessage(it.accountId, it.service) } ?: "アカウントを使い切っています"
         else -> r.message.ifEmpty { "サーバーエラー" }
     }
 
@@ -578,8 +723,26 @@ class ChallengePanel(
                 setOnClickListener { confirmDiscard(r) }
             })
             row.addView(buttons)
+            if (AccountUsage.isUsedUp(r)) {
+                val usedUpButtons = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
+                usedUpButtons.addView(pendingButton("切り替えて紐づけ直す") { switchAccountAndResend(r) })
+                usedUpButtons.addView(pendingButton("このまま送る") { confirmOverUse(r) })
+                row.addView(usedUpButtons)
+            }
             pendingContainer.addView(row)
         }
+    }
+
+    /** 未送信一覧の行のボタン（「再送」と同じ見た目）。 */
+    private fun pendingButton(label: String, onClick: () -> Unit) = Button(activity).apply {
+        text = label
+        isAllCaps = false
+        textSize = 12f
+        typeface = pixelFont
+        setTextColor(activity.resources.getColor(R.color.pixel_ink, null))
+        setBackgroundResource(R.drawable.btn_pixel)
+        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        setOnClickListener { onClick() }
     }
 
     /**
@@ -608,9 +771,13 @@ class ChallengePanel(
             var sent = 0
             var failed = 0
             var queueError = false
+            var usedUp: ChallengeRecord? = null
+            var lastResponse: ChallengeApi.Result? = null
             for (r in targets) {
                 // 内容もIDも変えずに送り直す。サーバー側が重複を弾く。
                 val response = ChallengeApi.send(url, password, r)
+                lastResponse = response
+                if (response.code == USED_UP && usedUp == null) usedUp = r
                 try {
                     when {
                         response.ok -> {
@@ -619,7 +786,7 @@ class ChallengePanel(
                         }
                         PendingRecords.needsAttention(response.code) -> {
                             failed++
-                            pending.markAttention(r.id, describe(response))
+                            pending.markAttention(r.id, describe(response, r))
                         }
                         else -> failed++  // 通信・サーバー一時エラーは次回も再送する
                     }
@@ -635,6 +802,9 @@ class ChallengePanel(
                 }
                 recordStatusText.text = if (queueError) "$summary（$QUEUE_UPDATE_FAILED）" else summary
                 renderPending()
+                lastResponse?.let { showAccountLeftFrom(it) }
+                // 何件止まっても、ダイアログは最初の1件だけ。残りは未送信一覧の行から選べる
+                usedUp?.let { showUsedUpDialog(it) }
             }
             ui
         }
@@ -665,7 +835,7 @@ class ChallengePanel(
                 if (response.ok) {
                     pending.remove(record.id)
                 } else if (PendingRecords.needsAttention(response.code)) {
-                    pending.markAttention(record.id, describe(response))
+                    pending.markAttention(record.id, describe(response, record))
                 }
             } catch (_: IOException) {
                 queueError = true
@@ -673,9 +843,11 @@ class ChallengePanel(
             val ui: () -> Unit = {
                 val text =
                     if (response.ok) (if (response.duplicate) "記録済みでした" else "送信しました")
-                    else describe(response)
+                    else describe(response, record)
                 recordStatusText.text = if (queueError) "$text（$QUEUE_UPDATE_FAILED）" else text
                 renderPending()
+                showAccountLeftFrom(response)
+                if (response.code == USED_UP) showUsedUpDialog(record)
             }
             ui
         }
@@ -714,6 +886,7 @@ class ChallengePanel(
          */
         private val inFlight = AtomicBoolean(false)
 
+        private const val USED_UP = "ACCOUNT_USED_UP"
         private const val BUSY_MESSAGE = "送信中です。終わるまでお待ちください"
         private const val NOT_SAVED_MESSAGE = "端末の空きがなく未送信にも保存できていません"
         private const val QUEUE_UPDATE_FAILED = "端末の空きがなく未送信の一覧を更新できませんでした"

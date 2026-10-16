@@ -30,6 +30,16 @@
             android:gravity="center"
             android:textColor="@color/pixel_sub"
             android:textSize="12sp" />
+
+        <!-- F16: 結び付けたアカウントと残り回数 -->
+        <TextView
+            android:id="@+id/accountLeftText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/pixel_sub"
+            android:textSize="12sp"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- 初回設定 -->

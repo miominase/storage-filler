@@ -1,6 +1,7 @@
 package jp.own.storagefiller;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
@@ -39,5 +40,12 @@ public class GoogleAccountsTest {
         assertEquals("Googleアカウント: a@gmail.com", G.label(one, new HashSet<>(Arrays.asList("a@gmail.com", "b@gmail.com"))));
         assertEquals("Googleアカウント: a@gmail.com（端末から削除されています）", G.label(one, new HashSet<>(Collections.singletonList("b@gmail.com"))));
         assertEquals("Googleアカウント: a@gmail.com（端末から削除されています）", G.label(one, Collections.emptySet()));
+    }
+
+    @Test
+    public void accountIdOf_normalizes() {
+        assertEquals("user0001", G.accountIdOf(" User0001@gmail.com "));
+        assertNull(G.accountIdOf("abc"));
+        assertNull(G.accountIdOf("@gmail.com"));
     }
 }

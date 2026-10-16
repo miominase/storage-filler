@@ -14,7 +14,7 @@ public class PendingRecordsTest {
 
     private ChallengeRecord record(String id) {
         return new ChallengeRecord(id, "2026-09-23T01:00:00.000Z", "001", 264.5, "成功", "LINE", "",
-                ChallengeRecord.STATUS_PENDING, "");
+                ChallengeRecord.STATUS_PENDING, "", "", false);
     }
 
     @Test
@@ -163,5 +163,32 @@ public class PendingRecordsTest {
         String[] left = dir.list();
         assertEquals(1, left.length);
         assertEquals("pending_records.json", left[0]);
+    }
+
+    @Test
+    public void replace_resetsStatus() throws Exception {
+        File file = File.createTempFile("pending_records", ".json");
+        assertTrue(file.delete());
+        file.deleteOnExit();
+        PendingRecords records = new PendingRecords(file);
+        records.add(record("aaaaaaaa-1111-1111-1111-111111111111"));
+        records.add(record("bbbbbbbb-2222-2222-2222-222222222222"));
+        records.markAttention("aaaaaaaa-1111-1111-1111-111111111111", "使い切り");
+
+        ChallengeRecord changed = new ChallengeRecord("aaaaaaaa-1111-1111-1111-111111111111",
+                "2026-09-23T01:00:00.000Z", "001", 264.5, "成功", "LINE", "",
+                ChallengeRecord.STATUS_ATTENTION, "使い切り", "other", false);
+        records.replace(changed);
+
+        List<ChallengeRecord> back = records.all();
+        assertEquals(2, back.size());
+        assertEquals("other", back.get(0).getAccountId());
+        assertEquals(ChallengeRecord.STATUS_PENDING, back.get(0).getStatus());
+        assertEquals("", back.get(0).getLastError());
+    }
+
+    @Test
+    public void needsAttention_includesAccountUsedUp() {
+        assertTrue(PendingRecords.Companion.needsAttention("ACCOUNT_USED_UP"));
     }
 }

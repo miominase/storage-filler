@@ -21,7 +21,11 @@ data class ChallengeRecord(
     val service: String,
     val memo: String,
     val status: String,
-    val lastError: String
+    val lastError: String,
+    /** 記録ボタンを押した時点で固定するアカウントID。空は従来どおり（チェックなし）。 */
+    val accountId: String = "",
+    /** 使い切りと分かったうえで「このまま送る」を選んだ記録。 */
+    val overUse: Boolean = false
 ) {
     /** APIへ送る形。サーバー側の validateRecord_ が読むキーと一致させる。 */
     fun toJson(): JSONObject = JSONObject()
@@ -34,6 +38,8 @@ data class ChallengeRecord(
         .put("memo", memo)
         .put("status", status)
         .put("lastError", lastError)
+        .put("accountId", accountId)
+        .put("overUse", overUse)
 
     companion object {
         const val STATUS_PENDING = "pending"
@@ -52,7 +58,9 @@ data class ChallengeRecord(
             service = o.optString("service"),
             memo = o.optString("memo"),
             status = o.optString("status", STATUS_PENDING),
-            lastError = o.optString("lastError")
+            lastError = o.optString("lastError"),
+            accountId = o.optString("accountId"),
+            overUse = o.optBoolean("overUse", false)
         )
 
         /** minSdk 24 では java.time が使えないため SimpleDateFormat を使う。 */
@@ -64,6 +72,7 @@ data class ChallengeRecord(
 
         fun create(
             deviceId: String,
+            accountId: String,
             hours: Double,
             result: String,
             service: String,
@@ -73,6 +82,7 @@ data class ChallengeRecord(
             id = UUID.randomUUID().toString(),
             at = isoNow(System.currentTimeMillis()),
             deviceId = deviceId,
+            accountId = accountId,
             hours = hours,
             result = result,
             service = service,

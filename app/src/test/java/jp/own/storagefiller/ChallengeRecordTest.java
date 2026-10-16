@@ -11,7 +11,7 @@ public class ChallengeRecordTest {
     private ChallengeRecord sample() {
         return new ChallengeRecord("11111111-2222-3333-4444-555555555555",
                 "2026-09-23T01:00:00.000Z", "001", 264.5, "成功", "LINE", "メモ",
-                ChallengeRecord.STATUS_PENDING, "前回は通信エラー");
+                ChallengeRecord.STATUS_PENDING, "前回は通信エラー", "user0001", true);
     }
 
     @Test
@@ -50,8 +50,26 @@ public class ChallengeRecordTest {
 
     @Test
     public void createMakesAnIdTheApiAccepts() {
-        ChallengeRecord r = ChallengeRecord.Companion.create("001", 1.0, "成功", "LINE", "");
+        ChallengeRecord r = ChallengeRecord.Companion.create("001", "user0001", 1.0, "成功", "LINE", "");
         assertTrue(r.getId(), r.getId().matches("[a-zA-Z0-9-]{16,80}"));
         assertEquals(ChallengeRecord.STATUS_PENDING, r.getStatus());
+    }
+
+    @Test
+    public void fromJson_withoutAccountFields() throws Exception {
+        // アップデート前に保存された未送信記録（キーなし）も読める
+        JSONObject old = sample().toJson();
+        old.remove("accountId");
+        old.remove("overUse");
+        ChallengeRecord r = ChallengeRecord.Companion.fromJson(old);
+        assertEquals("", r.getAccountId());
+        assertEquals(false, r.getOverUse());
+    }
+
+    @Test
+    public void toJson_roundTripsAccountFields() throws Exception {
+        ChallengeRecord r = ChallengeRecord.Companion.fromJson(sample().toJson());
+        assertEquals("user0001", r.getAccountId());
+        assertEquals(true, r.getOverUse());
     }
 }

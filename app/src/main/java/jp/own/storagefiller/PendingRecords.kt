@@ -56,6 +56,13 @@ class PendingRecords(private val file: File) {
         write(read().filter { it.id != id })
     }
 
+    /** 未送信の記録を同じIDのまま差し替え、送信待ちに戻す（アカウント変更・使い切り後の送信用）。 */
+    @Throws(IOException::class)
+    fun replace(record: ChallengeRecord) = synchronized(lock) {
+        val fresh = record.copy(status = ChallengeRecord.STATUS_PENDING, lastError = "")
+        write(read().map { if (it.id == record.id) fresh else it })
+    }
+
     /** 自動再送では直らない失敗。内容とIDは変えずに残す。 */
     @Throws(IOException::class)
     fun markAttention(id: String, message: String) = synchronized(lock) {
@@ -156,6 +163,7 @@ class PendingRecords(private val file: File) {
          * サーバー一時エラーと通信失敗は再送対象として残す。
          */
         fun needsAttention(code: String): Boolean =
-            code == "AUTH" || code == "DEVICE_NOT_ACTIVE" || code == "VALIDATION" || code == "CONFLICT"
+            code == "AUTH" || code == "DEVICE_NOT_ACTIVE" || code == "VALIDATION" || code == "CONFLICT" ||
+                code == "ACCOUNT_USED_UP"
     }
 }
