@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>すごくいいストレージ</title>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif;background:#f4f6fa;color:#1d2433;line-height:1.7}
+main{max-width:560px;margin:0 auto;padding:40px 20px}
+h1{font-size:1.8rem;margin:0 0 8px}
+.card{background:#fff;border-radius:16px;padding:20px;margin:20px 0;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+#dl{display:block;text-align:center;background:#1a5fd0;color:#fff;font-size:1.3rem;font-weight:700;text-decoration:none;padding:18px 12px;border-radius:14px}
+#dl:hover,#dl:focus{background:#1448a3}
+#ver{text-align:center;margin:10px 0 0;color:#4a5468}
+ul{padding-left:1.2em;margin:0}
+small{color:#4a5468}
+</style>
+</head>
+<body>
+<main>
+<h1>すごくいいストレージ</h1>
+<p>空き容量をわざと埋めるテスト用の Android アプリです。ダミーファイルを作って、あとでまとめて削除できます。Android 7.0 以上で使えます。root は不要です。</p>
+
+<div class="card">
+<a id="dl" href="https://github.com/miominase/storage-filler/releases/latest">最新版をダウンロード</a>
+<p id="ver">最新バージョンを確認中…</p>
+</div>
+
+<div class="card">
+<ul>
+<li>インストールするとき、「提供元不明のアプリ」の許可が必要です。</li>
+<li>2回目以降の更新は、アプリ内の「アップデートを確認」からもできます。</li>
+</ul>
+</div>
+<p><small>ダウンロードはリリースページ（GitHub）から行われます。</small></p>
+</main>
+<script>
+fetch("https://api.github.com/repos/miominase/storage-filler/releases/latest")
+  .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+  .then(function(d){
+    var a = (d.assets || []).filter(function(x){ return /\.apk$/i.test(x.name); })[0];
+    if(!a) throw 0;
+    document.getElementById("dl").href = a.browser_download_url;
+    document.getElementById("ver").textContent = "最新バージョン：" + d.tag_name;
+  })
+  .catch(function(){
+    document.getElementById("ver").textContent = "リンク先のリリースページから最新版を選べます。";
+  });
+</script>
+</body>
+</html>
