@@ -14,6 +14,9 @@ object ChallengeApi {
     // Apps Script はしばらく呼ばれていないと起動に時間がかかり、20秒では足りないことがあった（2026-10-06 ユーザー判断で40秒）
     private const val TIMEOUT_MS = 40000
 
+    /** 応答がJSONとして読めなかった（ログイン画面のHTML、使い切りの echo URL を2回読んだときの「Not available」など）。 */
+    const val UNREADABLE = "UNREADABLE"
+
     data class Result(
         val ok: Boolean,
         val code: String = "",
@@ -71,7 +74,19 @@ object ChallengeApi {
         return body
     }
 
+    /**
+     * 読めない応答のときだけ、すぐ1回だけ送り直す。record はIDで重複を弾き、account は読むだけなので二重に届いても害がない。
+     * 2回目も読めなければその結果をそのまま返す（未送信に残して自動再送）。
+     */
     private fun post(url: String, body: JSONObject): Result {
+        val first = postOnce(url, body)
+        return if (shouldRetry(first)) postOnce(url, body) else first
+    }
+
+    /** 送り直してよい失敗か。サーバーが返したエラーコードと通信失敗は送り直さない。 */
+    fun shouldRetry(result: Result): Boolean = result.code == UNREADABLE
+
+    private fun postOnce(url: String, body: JSONObject): Result {
         var conn: HttpURLConnection? = null
         return try {
             conn = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -83,6 +98,9 @@ object ChallengeApi {
                 instanceFollowRedirects = true
                 setRequestProperty("Content-Type", "application/json")
                 setRequestProperty("User-Agent", "StorageFiller")
+                // echo URL は1回しか読めない。使い回した接続が切れていると転送先の GET が黙って送り直され、
+                // 2回目は「Not available」になる（v0.10.0 で発生）。接続を使い回さず毎回つなぎ直す。
+                setRequestProperty("Connection", "close")
             }
             conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
@@ -121,6 +139,6 @@ object ChallengeApi {
             )
         }
     } catch (_: Exception) {
-        Result(ok = false, code = "SERVER", message = "サーバーから不明な応答が返りました")
+        Result(ok = false, code = UNREADABLE, message = "サーバーから不明な応答が返りました")
     }
 }

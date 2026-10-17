@@ -92,8 +92,8 @@ class ChallengePanel(
         render()
         if (config.isBound()) {
             fillHoursFromUptime()
-            refreshAccountLeft()
-            resendPending()
+            // 同時に通信すると応答の取り違えが起きたため（v0.10.0）、再送が終わってから残りを問い合わせる
+            resendPending(then = ::refreshAccountLeft)
         }
     }
 
@@ -123,6 +123,7 @@ class ChallengePanel(
 
     /**
      * 画面を開いたときに残りを問い合わせる。読むだけなので送信中フラグは取らない。
+     * 再送と同時に走らせないよう、onShown からは resendPending の後に呼ぶ。
      * 通信の失敗は ChallengeApi が Result にして返す（例外は出ない）。
      */
     private fun refreshAccountLeft() {
@@ -748,14 +749,19 @@ class ChallengePanel(
     /**
      * 記録画面を開いたときの自動再送。
      * 要確認の記録は送り直しても同じ結果になるため飛ばす。
+     * [then] は再送が終わった後（再送しなかったときはすぐ）UIスレッドで呼ぶ。
      */
-    private fun resendPending() {
+    private fun resendPending(then: () -> Unit = {}) {
         if (!config.isBound()) return
         // 別の ChallengePanel（回転前の画面など）が送信中なら、そちらに任せる
-        if (!inFlight.compareAndSet(false, true)) return
+        if (!inFlight.compareAndSet(false, true)) {
+            then()
+            return
+        }
         val targets = pending.all().filter { it.status != ChallengeRecord.STATUS_ATTENTION }
         if (targets.isEmpty()) {
             inFlight.set(false)
+            then()
             return
         }
 
@@ -767,6 +773,7 @@ class ChallengePanel(
         runInBackground(onError = {
             recordStatusText.text = "未送信の再送中にエラーが起きました"
             renderPending()
+            then()
         }) {
             var sent = 0
             var failed = 0
@@ -805,6 +812,7 @@ class ChallengePanel(
                 lastResponse?.let { showAccountLeftFrom(it) }
                 // 何件止まっても、ダイアログは最初の1件だけ。残りは未送信一覧の行から選べる
                 usedUp?.let { showUsedUpDialog(it) }
+                then()
             }
             ui
         }

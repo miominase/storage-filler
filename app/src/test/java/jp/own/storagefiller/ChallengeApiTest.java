@@ -43,7 +43,34 @@ public class ChallengeApiTest {
         // Apps Script はログイン画面のHTMLを返すことがある。JSONでなければサーバー側の問題として扱う。
         ChallengeApi.Result r = ChallengeApi.INSTANCE.parse("<!DOCTYPE html><html>...");
         assertFalse(r.getOk());
-        assertEquals("SERVER", r.getCode());
+        assertEquals(ChallengeApi.UNREADABLE, r.getCode());
+        assertEquals("サーバーから不明な応答が返りました", r.getMessage());
+    }
+
+    @Test
+    public void parseTreatsNotAvailableAsUnreadable() {
+        // 使い切りの echo URL を2回読むと doGet の「Not available」が返る
+        ChallengeApi.Result r = ChallengeApi.INSTANCE.parse("Not available");
+        assertFalse(r.getOk());
+        assertEquals(ChallengeApi.UNREADABLE, r.getCode());
+    }
+
+    @Test
+    public void shouldRetryOnlyForUnreadable() {
+        assertTrue(ChallengeApi.INSTANCE.shouldRetry(ChallengeApi.INSTANCE.parse("Not available")));
+        assertTrue(ChallengeApi.INSTANCE.shouldRetry(ChallengeApi.INSTANCE.parse("")));
+        assertFalse(ChallengeApi.INSTANCE.shouldRetry(ChallengeApi.INSTANCE.parse("{\"ok\":true}")));
+        for (String code : new String[] { "AUTH", "DEVICE_NOT_ACTIVE", "VALIDATION", "CONFLICT", "SERVER", "ACCOUNT_USED_UP" }) {
+            assertFalse(code, ChallengeApi.INSTANCE.shouldRetry(ChallengeApi.INSTANCE.parse(
+                    "{\"ok\":false,\"error\":{\"code\":\"" + code + "\",\"message\":\"x\"}}")));
+        }
+        assertFalse(ChallengeApi.INSTANCE.shouldRetry(new ChallengeApi.Result(false, "NETWORK", "x", "", false, "", null, null)));
+    }
+
+    @Test
+    public void unreadableIsResentLater() {
+        // 再試行しても読めなければ、今までの SERVER と同じく未送信に残して自動再送する
+        assertFalse(PendingRecords.Companion.needsAttention(ChallengeApi.UNREADABLE));
     }
 
     @Test
