@@ -118,4 +118,68 @@ public class ChallengeApiTest {
         assertEquals("user1", full.getString("accountId"));
         assertTrue(full.getBoolean("overUse"));
     }
+
+    private ChallengeRecord parentRec(String parent, Integer reward, Integer points, boolean endParent) {
+        return new ChallengeRecord("11111111-2222-3333-4444-555555555555",
+                "2026-09-23T01:00:00.000Z", "001", 264.5, "成功", "LINE", "",
+                ChallengeRecord.STATUS_PENDING, "", "", false,
+                ChallengeRecord.KIND_RECORD, parent, reward, points, endParent, "");
+    }
+
+    @Test
+    public void recordBodyOmitsEmptyParentFields() throws Exception {
+        org.json.JSONObject r = ChallengeApi.INSTANCE.recordBody("pw", parentRec("", null, null, false))
+                .getJSONObject("record");
+        assertFalse(r.has("parentDeviceId"));
+        assertFalse(r.has("checkinReward"));
+        assertFalse(r.has("invitePoints"));
+        assertFalse(r.has("endParent"));
+    }
+
+    @Test
+    public void recordBodyIncludesParentFields() throws Exception {
+        org.json.JSONObject r = ChallengeApi.INSTANCE.recordBody("pw", parentRec("42", 30, 5, true))
+                .getJSONObject("record");
+        assertEquals("42", r.getString("parentDeviceId"));
+        assertEquals(30, r.getInt("checkinReward"));
+        assertEquals(5, r.getInt("invitePoints"));
+        assertTrue(r.getBoolean("endParent"));
+    }
+
+    @Test
+    public void recordBodyKeepsZeroAsZero() throws Exception {
+        org.json.JSONObject r = ChallengeApi.INSTANCE.recordBody("pw", parentRec("42", 0, 0, false))
+                .getJSONObject("record");
+        assertEquals(0, r.getInt("checkinReward"));
+        assertEquals(0, r.getInt("invitePoints"));
+    }
+
+    @Test
+    public void endParentBodyHasTheContractFields() throws Exception {
+        ChallengeRecord e = ChallengeRecord.Companion.createEndParent("37", ChallengeRecord.REASON_GIVE_UP);
+        org.json.JSONObject b = ChallengeApi.INSTANCE.endParentBody("pw", e);
+        assertEquals("endParent", b.getString("action"));
+        assertEquals("pw", b.getString("password"));
+        assertEquals(e.getId(), b.getString("id"));
+        assertEquals("37", b.getString("deviceId"));
+        assertEquals(e.getAt(), b.getString("endedAt"));
+        assertEquals("giveUp", b.getString("reason"));
+        assertFalse(b.has("record"));
+    }
+
+    @Test
+    public void endParentBodyKeepsTheSameIdOnResend() throws Exception {
+        ChallengeRecord e = ChallengeRecord.Companion.createEndParent("37", ChallengeRecord.REASON_RESET);
+        ChallengeRecord restored = ChallengeRecord.Companion.fromJson(e.toJson());
+        assertEquals(ChallengeApi.INSTANCE.endParentBody("pw", e).toString(),
+                ChallengeApi.INSTANCE.endParentBody("pw", restored).toString());
+    }
+
+    @Test
+    public void parseIgnoresTheParentInTheResponse() {
+        ChallengeApi.Result r = ChallengeApi.INSTANCE.parse(
+                "{\"ok\":true,\"parent\":{\"deviceId\":\"42\",\"endedAt\":\"x\"},\"duplicate\":false}");
+        assertTrue(r.getOk());
+        assertFalse(r.getDuplicate());
+    }
 }

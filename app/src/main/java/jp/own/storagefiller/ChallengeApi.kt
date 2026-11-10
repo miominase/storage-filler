@@ -50,8 +50,24 @@ object ChallengeApi {
         return post(url, body)
     }
 
+    /** 未送信キューの1件を送る。種別で本文を切り替える（再送でも同じ id のまま）。 */
     fun send(url: String, password: String, record: ChallengeRecord): Result =
-        post(url, recordBody(password, record))
+        post(url, if (record.isEndParent) endParentBody(password, record) else recordBody(password, record))
+
+    /**
+     * 単独の親の終了（action=endParent）の本文。id は再送でも同じ。endedAt は記録を作った時刻。
+     * 自端末の親を終了する。応答の `parent` は読まない（parse は未知のキーを無視する）。
+     */
+    fun endParentBody(password: String, record: ChallengeRecord): JSONObject {
+        val body = JSONObject()
+            .put("action", "endParent")
+            .put("password", password)
+            .put("id", record.id)
+            .put("deviceId", record.deviceId)
+            .put("reason", record.endReason)
+        if (record.at.isNotEmpty()) body.put("endedAt", record.at)
+        return body
+    }
 
     /** record の送信本文。 */
     fun recordBody(password: String, record: ChallengeRecord): JSONObject {
@@ -67,6 +83,11 @@ object ChallengeApi {
         // 古いサーバー・古い記録と同じ形に保つため、空・falseのときはキーごと省く
         if (record.accountId.isNotEmpty()) payload.put("accountId", record.accountId)
         if (record.overUse) payload.put("overUse", true)
+        // 親の記録の項目も同じ流儀で、空・null・falseはキーごと省く（0は「0円」として送る）
+        if (record.parentDeviceId.isNotEmpty()) payload.put("parentDeviceId", record.parentDeviceId)
+        if (record.checkinReward != null) payload.put("checkinReward", record.checkinReward)
+        if (record.invitePoints != null) payload.put("invitePoints", record.invitePoints)
+        if (record.endParent) payload.put("endParent", true)
         val body = JSONObject()
             .put("action", "record")
             .put("password", password)

@@ -242,10 +242,14 @@ class MainActivity : Activity(), FillEngine.Listener {
      * targetSdk 35 では Android 15+ が edge-to-edge を強制するため、
      * layout_marginBottom="16dp" だけではナビゲーションバーの裏に隠れてタップできない。
      * XML の16dpマージンにボトム側システムバーの高さを足し、ナビゲーションバーの上へ浮かせる。
+     * 横画面＋3ボタンナビではナビゲーションバーが右（または左）端に出るので、
+     * end 側のマージンにもその幅を足して、ナビゲーションバーの内側へ寄せる。
      * インセットは消費せず返し、他のビューにも届くようにする。
      */
     private fun applyMenuButtonInsets() {
-        val baseBottomMargin = (menuButton.layoutParams as ViewGroup.MarginLayoutParams).bottomMargin
+        val baseLp = menuButton.layoutParams as ViewGroup.MarginLayoutParams
+        val baseBottomMargin = baseLp.bottomMargin
+        val baseEndMargin = baseLp.marginEnd
         menuButton.setOnApplyWindowInsetsListener { view, insets ->
             val navBarInset = if (Build.VERSION.SDK_INT >= 30) {
                 insets.getInsets(WindowInsets.Type.systemBars()).bottom
@@ -253,8 +257,12 @@ class MainActivity : Activity(), FillEngine.Listener {
                 @Suppress("DEPRECATION")
                 insets.systemWindowInsetBottom
             }
+            val (left, right) = sideInsetsOf(insets)
             val lp = view.layoutParams as ViewGroup.MarginLayoutParams
             lp.bottomMargin = baseBottomMargin + navBarInset
+            lp.marginEnd = SideInsets.menuEndMargin(
+                baseEndMargin, left, right, rtl = view.layoutDirection == View.LAYOUT_DIRECTION_RTL
+            )
             view.layoutParams = lp
             insets
         }
@@ -263,13 +271,16 @@ class MainActivity : Activity(), FillEngine.Listener {
     /**
      * 同じく edge-to-edge のため、両パネルの先頭がステータスバーの裏に入り、
      * 時計・電池表示と見出しが重なる。上側システムバーの高さを ScrollView の
-     * paddingTop に足して逃がす。clipToPadding は既定のままなので、
-     * スクロールした中身がステータスバーの帯へはみ出すこともない。
+     * paddingTop に足して逃がす。横画面で左右に出るナビゲーションバー・カメラの切り欠きの幅も
+     * 左右の padding に足し、中身がその裏に入らないようにする。
+     * clipToPadding は既定のままなので、スクロールした中身がシステムバーの帯へはみ出すこともない。
      * インセットは消費せず返し、兄弟のメニューボタンにも届くようにする。
      */
     private fun applyPanelTopInsets() {
         for (panel in listOf(storagePanel, challengePanel)) {
             val basePaddingTop = panel.paddingTop
+            val basePaddingLeft = panel.paddingLeft
+            val basePaddingRight = panel.paddingRight
             panel.setOnApplyWindowInsetsListener { view, insets ->
                 val statusBarInset = if (Build.VERSION.SDK_INT >= 30) {
                     insets.getInsets(WindowInsets.Type.systemBars()).top
@@ -277,16 +288,30 @@ class MainActivity : Activity(), FillEngine.Listener {
                     @Suppress("DEPRECATION")
                     insets.systemWindowInsetTop
                 }
+                val (left, right) = sideInsetsOf(insets)
+                val (padLeft, padRight) = SideInsets.panelPadding(basePaddingLeft, basePaddingRight, left, right)
                 view.setPadding(
-                    view.paddingLeft,
+                    padLeft,
                     basePaddingTop + statusBarInset,
-                    view.paddingRight,
+                    padRight,
                     view.paddingBottom
                 )
                 insets
             }
         }
     }
+
+    /** 左右のシステムバーとカメラの切り欠きの幅（左, 右）。縦画面ではふつう両方 0。 */
+    private fun sideInsetsOf(insets: WindowInsets): Pair<Int, Int> =
+        if (Build.VERSION.SDK_INT >= 30) {
+            val side = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+            Pair(side.left, side.right)
+        } else {
+            // API 29 以前の systemWindowInset は切り欠きを含まないが、targetSdk 35 の edge-to-edge 強制は
+            // Android 15+ だけなので、ここではナビゲーションバーを避けられれば足りる
+            @Suppress("DEPRECATION")
+            Pair(insets.systemWindowInsetLeft, insets.systemWindowInsetRight)
+        }
 
     /** ビューツリーを辿って全テキストにドットフォントを当てる。太字指定は太字フォントに差し替える */
     private fun applyPixelFont(v: View) {

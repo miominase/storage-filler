@@ -45,6 +45,52 @@ public class ChallengeInputTest {
     }
 
     @Test
+    public void parseCountAcceptsNonNegativeIntegers() {
+        assertEquals(Integer.valueOf(0), IN.parseCount("0"));
+        assertEquals(Integer.valueOf(30), IN.parseCount(" 30 "));
+        assertEquals(Integer.valueOf(7), IN.parseCount("007"));
+        assertEquals(Integer.valueOf(2147483647), IN.parseCount("2147483647"));
+    }
+
+    @Test
+    public void parseCountRejectsEverythingElse() {
+        assertNull(IN.parseCount(""));
+        assertNull(IN.parseCount("   "));
+        assertNull(IN.parseCount("-1"));
+        assertNull(IN.parseCount("+5"));
+        assertNull(IN.parseCount("1.5"));
+        assertNull(IN.parseCount("1,000"));
+        assertNull(IN.parseCount("abc"));
+        assertNull(IN.parseCount("１２"));
+        assertNull(IN.parseCount("2147483648"));
+    }
+
+    @Test
+    public void deviceIdFormat() {
+        assertTrue(IN.isValidDeviceId("37"));
+        assertTrue(IN.isValidDeviceId("001"));
+        assertTrue(IN.isValidDeviceId("dev_A-1"));
+        assertFalse(IN.isValidDeviceId(""));
+        assertFalse(IN.isValidDeviceId(" 37"));
+        assertFalse(IN.isValidDeviceId("3 7"));
+        assertFalse(IN.isValidDeviceId("37\n"));
+        assertFalse(IN.isValidDeviceId("端末"));
+        assertFalse(IN.isValidDeviceId("a/b"));
+        assertFalse(IN.isValidDeviceId("1234567890123456789012345678901234567890x"));
+    }
+
+    @Test
+    public void summaryDistinguishesKinds() {
+        ChallengeRecord rec = ChallengeRecord.Companion.create(
+                "001", "u", 1.5, "成功", "LINE", "", "42", null, null, true);
+        assertEquals("成功 / LINE / 1.50h / 親:42 / 親を終了", IN.summary(rec));
+        ChallengeRecord end = ChallengeRecord.Companion.createEndParent("37", ChallengeRecord.REASON_RESET);
+        assertEquals("親の終了（初期化）", IN.summary(end));
+        ChallengeRecord old = ChallengeRecord.Companion.create("001", "u", 1.5, "失敗", "Google", "");
+        assertEquals("失敗 / Google / 1.50h", IN.summary(old));
+    }
+
+    @Test
     public void apiUrlAcceptsOnlyAppsScriptWebApps() {
         assertTrue(IN.isValidApiUrl("https://script.google.com/macros/s/AKfycbxxxx/exec"));
         assertTrue(IN.isValidApiUrl("  https://script.google.com/macros/s/AKfycbxxxx/exec  "));

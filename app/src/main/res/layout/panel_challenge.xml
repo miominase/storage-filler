@@ -204,6 +204,63 @@
                 android:textSize="15sp" />
         </LinearLayout>
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="当てた親の端末ID（必須）"
+            android:textColor="@color/pixel_ink"
+            android:textSize="13sp" />
+
+        <EditText
+            android:id="@+id/parentDeviceInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/btn_pixel"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:padding="8dp"
+            android:textColor="@color/pixel_ink"
+            android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/checkinRewardInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/btn_pixel"
+            android:hint="チェックイン報酬（円・任意）"
+            android:importantForAutofill="no"
+            android:inputType="number"
+            android:padding="8dp"
+            android:textColor="@color/pixel_ink"
+            android:textColorHint="@color/pixel_shadow"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/invitePointsInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/btn_pixel"
+            android:hint="親の即時ポイント（成功のときだけ送る・任意）"
+            android:importantForAutofill="no"
+            android:inputType="number"
+            android:padding="8dp"
+            android:textColor="@color/pixel_ink"
+            android:textColorHint="@color/pixel_shadow"
+            android:textSize="12sp" />
+
+        <CheckBox
+            android:id="@+id/endParentCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="この端末を親として続けない"
+            android:textColor="@color/pixel_ink"
+            android:textSize="13sp" />
+
         <EditText
             android:id="@+id/memoInput"
             android:layout_width="match_parent"
@@ -243,6 +300,16 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:textColor="@color/pixel_ink"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/endParentButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/btn_pixel"
+            android:text="親を終了"
+            android:textColor="@color/pixel_sub"
             android:textSize="12sp" />
 
         <Button

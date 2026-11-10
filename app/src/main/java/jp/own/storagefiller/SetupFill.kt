@@ -81,6 +81,9 @@ object SetupFill {
      * （取得も失敗すればクリップボードへ案内するので、行き止まりにはならない）。
      */
     fun classifyScanError(errorCode: Int?): ScanFailure = when (errorCode) {
+        // 13（INTERNAL）は、読み取り画面が理由を付けずに閉じたとき（端末の「戻る」など）にライブラリが
+        // 既定値として入れる番号。× の 201 と同じく「閉じた」とみなして何も出さない（KNOWLEDGE.md）
+        MlKitException.INTERNAL,
         MlKitException.CODE_SCANNER_CANCELLED -> ScanFailure.CANCELLED
         MlKitException.CODE_SCANNER_TASK_IN_PROGRESS -> ScanFailure.IN_PROGRESS
         MlKitException.CODE_SCANNER_GOOGLE_PLAY_SERVICES_VERSION_TOO_OLD -> ScanFailure.PLAY_SERVICES_OLD
@@ -89,5 +92,40 @@ object SetupFill {
         MlKitException.CODE_SCANNER_PIPELINE_INITIALIZATION_ERROR,
         MlKitException.CODE_SCANNER_PIPELINE_INFERENCE_ERROR -> ScanFailure.OTHER
         else -> ScanFailure.MODULE_MISSING  // UNAVAILABLE / CODE_SCANNER_UNAVAILABLE / 不明
+    }
+
+    /** 読み取りモジュールの取得を待つ時間。過ぎても終わらなければ案内を差し替える。 */
+    const val MODULE_WAIT_TIMEOUT_MS = 60_000L
+
+    /** 読み取りモジュールの取得中に、案内欄にいま何が出ているか。 */
+    enum class ModuleWaitShown {
+        /** 「準備しています」 */
+        PREPARING,
+
+        /** 「時間がかかっています」（タイムアウト後） */
+        SLOW,
+
+        /** それ以外（別の操作の案内など）。取得の結果で上書きしない。 */
+        OTHER
+    }
+
+    /** 読み取りモジュールの取得で起きたこと。 */
+    enum class ModuleWaitEvent { TIMED_OUT, COMPLETED, FAILED }
+
+    /** 案内欄に出し直す内容。 */
+    enum class ModuleWaitNotice { SLOW, READY, UNAVAILABLE }
+
+    /**
+     * 取得待ちの案内をどう差し替えるか。null は「変えない」。
+     * 取得待ちの案内（準備中・時間がかかっています）が出ているときだけ差し替え、
+     * その間に出た別の案内は消さない。タイムアウト後に取得が終われば「準備ができました」に変える。
+     */
+    fun moduleWaitNext(shown: ModuleWaitShown, event: ModuleWaitEvent): ModuleWaitNotice? {
+        if (shown == ModuleWaitShown.OTHER) return null
+        return when (event) {
+            ModuleWaitEvent.TIMED_OUT -> if (shown == ModuleWaitShown.PREPARING) ModuleWaitNotice.SLOW else null
+            ModuleWaitEvent.COMPLETED -> ModuleWaitNotice.READY
+            ModuleWaitEvent.FAILED -> ModuleWaitNotice.UNAVAILABLE
+        }
     }
 }

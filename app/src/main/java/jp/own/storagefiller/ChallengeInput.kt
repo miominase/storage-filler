@@ -24,6 +24,37 @@ object ChallengeInput {
     }
 
     /**
+     * 0以上の整数の入力を読む（チェックイン報酬・親の即時ポイント）。半角数字だけを受け付け、
+     * 符号・小数・空白だけ・Int に収まらない値は null。空欄を許すかどうかは呼び出し側で先に判断する。
+     */
+    fun parseCount(text: String): Int? {
+        val t = text.trim()
+        if (t.isEmpty() || !t.all { it in '0'..'9' }) return null
+        return t.toIntOrNull()
+    }
+
+    private val DEVICE_ID_PATTERN = Regex("^[A-Za-z0-9_-]{1,40}$")
+
+    /** 端末IDとして送ってよい形か（前後の空白は呼び出し側で除く）。存在するかどうかはサーバーが判断する。 */
+    fun isValidDeviceId(text: String): Boolean = DEVICE_ID_PATTERN.matches(text)
+
+    /** 未送信一覧・破棄確認で見せる1行の要約。 */
+    fun summary(r: ChallengeRecord): String {
+        if (r.isEndParent) {
+            val why = when (r.endReason) {
+                ChallengeRecord.REASON_RESET -> "初期化"
+                ChallengeRecord.REASON_GIVE_UP -> "失敗して続けない"
+                else -> r.endReason
+            }
+            return "親の終了（$why）"
+        }
+        val base = "${r.result} / ${r.service} / ${formatHours(r.hours)}h"
+        val parent = if (r.parentDeviceId.isEmpty()) "" else " / 親:${r.parentDeviceId}"
+        val end = if (r.endParent) " / 親を終了" else ""
+        return base + parent + end
+    }
+
+    /**
      * 記録APIとして受け付けるURLか。パスワードを送る先なので、Apps Script のウェブアプリ
      * （https://script.google.com/macros/s/...）以外には送らない。
      * 文字列の前方一致ではなく URI として解析して判定する（"https://script.google.com@evil.example/"

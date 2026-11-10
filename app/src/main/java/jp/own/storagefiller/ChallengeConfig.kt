@@ -19,6 +19,13 @@ class ChallengeConfig(context: Context) {
 
     val accountId: String get() = prefs.getString(KEY_ACCOUNT_ID, "") ?: ""
 
+    /** 最後に記録で使った親の端末ID（入力の手間を減らす用）。解除（unbind）で消える。 */
+    val lastParentDeviceId: String get() = prefs.getString(KEY_LAST_PARENT, "") ?: ""
+
+    fun saveLastParentDeviceId(id: String) {
+        prefs.edit().putString(KEY_LAST_PARENT, id.trim()).apply()
+    }
+
     fun isBound(): Boolean = apiUrl.isNotEmpty() && password.isNotEmpty() && deviceId.isNotEmpty()
 
     fun save(url: String, password: String, deviceId: String, deviceName: String, accountId: String) {
@@ -42,5 +49,6 @@ class ChallengeConfig(context: Context) {
         const val KEY_DEVICE_ID = "device_id"
         const val KEY_DEVICE_NAME = "device_name"
         const val KEY_ACCOUNT_ID = "account_id"
+        const val KEY_LAST_PARENT = "last_parent_device_id"
     }
 }

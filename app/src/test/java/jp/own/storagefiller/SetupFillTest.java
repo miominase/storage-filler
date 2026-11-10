@@ -2,6 +2,7 @@ package jp.own.storagefiller;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -62,6 +63,13 @@ public class SetupFillTest {
     }
 
     @Test
+    public void closingWithBackIsTreatedLikeCancel() {
+        // 端末の「戻る」で閉じると、ライブラリは理由なしの既定値 13（INTERNAL）を返す。× の 201 と同じく何も出さない
+        assertEquals(13, MlKitException.INTERNAL);
+        assertEquals(SetupFill.ScanFailure.CANCELLED, F.classifyScanError(MlKitException.INTERNAL));
+    }
+
+    @Test
     public void missingModuleOrUnknownFailureAsksForTheModule() {
         assertEquals(SetupFill.ScanFailure.MODULE_MISSING,
                 F.classifyScanError(MlKitException.CODE_SCANNER_UNAVAILABLE));
@@ -89,5 +97,39 @@ public class SetupFillTest {
         assertTrue(F.shouldClearClipboard(F.plan(null, "dummypass")));
         // 設定用の内容が無かったときは、関係ないクリップボードを消さない
         assertFalse(F.shouldClearClipboard(F.plan(null, null)));
+    }
+
+    // ---- 読み取りモジュールの取得待ち ----
+
+    @Test
+    public void timeoutReplacesThePreparingNoticeOnce() {
+        assertEquals(SetupFill.ModuleWaitNotice.SLOW,
+                F.moduleWaitNext(SetupFill.ModuleWaitShown.PREPARING, SetupFill.ModuleWaitEvent.TIMED_OUT));
+        // 「時間がかかっています」が出たあとは、もう一度タイムアウトしても変えない
+        assertNull(F.moduleWaitNext(SetupFill.ModuleWaitShown.SLOW, SetupFill.ModuleWaitEvent.TIMED_OUT));
+    }
+
+    @Test
+    public void finishingAfterTheTimeoutStillUpdatesTheNotice() {
+        assertEquals(SetupFill.ModuleWaitNotice.READY,
+                F.moduleWaitNext(SetupFill.ModuleWaitShown.SLOW, SetupFill.ModuleWaitEvent.COMPLETED));
+        assertEquals(SetupFill.ModuleWaitNotice.UNAVAILABLE,
+                F.moduleWaitNext(SetupFill.ModuleWaitShown.SLOW, SetupFill.ModuleWaitEvent.FAILED));
+        assertEquals(SetupFill.ModuleWaitNotice.READY,
+                F.moduleWaitNext(SetupFill.ModuleWaitShown.PREPARING, SetupFill.ModuleWaitEvent.COMPLETED));
+        assertEquals(SetupFill.ModuleWaitNotice.UNAVAILABLE,
+                F.moduleWaitNext(SetupFill.ModuleWaitShown.PREPARING, SetupFill.ModuleWaitEvent.FAILED));
+    }
+
+    @Test
+    public void otherNoticesAreNeverOverwritten() {
+        for (SetupFill.ModuleWaitEvent e : SetupFill.ModuleWaitEvent.values()) {
+            assertNull(F.moduleWaitNext(SetupFill.ModuleWaitShown.OTHER, e));
+        }
+    }
+
+    @Test
+    public void moduleWaitTimeoutIsAMinute() {
+        assertEquals(60_000L, SetupFill.MODULE_WAIT_TIMEOUT_MS);
     }
 }

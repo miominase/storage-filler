@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.view.View
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -63,6 +64,11 @@ class ChallengePanel(
     private val recordSuccessButton: Button = root.findViewById(R.id.recordSuccessButton)
     private val recordFailureButton: Button = root.findViewById(R.id.recordFailureButton)
     private val recordStatusText: TextView = root.findViewById(R.id.recordStatusText)
+    private val parentDeviceInput: EditText = root.findViewById(R.id.parentDeviceInput)
+    private val checkinRewardInput: EditText = root.findViewById(R.id.checkinRewardInput)
+    private val invitePointsInput: EditText = root.findViewById(R.id.invitePointsInput)
+    private val endParentCheck: CheckBox = root.findViewById(R.id.endParentCheck)
+    private val endParentButton: Button = root.findViewById(R.id.endParentButton)
     private val unbindButton: Button = root.findViewById(R.id.unbindButton)
 
     private val pendingHeader: TextView = root.findViewById(R.id.pendingHeader)
@@ -73,9 +79,13 @@ class ChallengePanel(
     /** QR読み取り画面を開いている間 true。二度押しで読み取り画面を重ねないため。 */
     private var scanning = false
 
+    /** 読み取りモジュールの取得待ちのタイムアウト（待っていないときは null）。 */
+    private var moduleWaitTimeout: Runnable? = null
+
     init {
-        listOf(scanQrButton, clipboardImportButton, bindButton, recordSuccessButton, recordFailureButton, unbindButton)
+        listOf(scanQrButton, clipboardImportButton, bindButton, recordSuccessButton, recordFailureButton, endParentButton, unbindButton)
             .forEach { it.isAllCaps = false }
+        endParentButton.setOnClickListener { confirmEndParent() }
         serviceLine.setOnClickListener { selectService("LINE") }
         serviceGoogle.setOnClickListener { selectService("Google") }
         scanQrButton.setOnClickListener { scanQr() }
@@ -92,6 +102,7 @@ class ChallengePanel(
         render()
         if (config.isBound()) {
             fillHoursFromUptime()
+            fillParentFromLast()
             // 同時に通信すると応答の取り違えが起きたため（v0.10.0）、再送が終わってから残りを問い合わせる
             resendPending(then = ::refreshAccountLeft)
         }
@@ -242,9 +253,19 @@ class ChallengePanel(
         hoursInput.setText(ChallengeInput.formatHours(hours))
     }
 
+    /** 親の端末IDが空なら、最後に使った値を入れる（手で直せる）。 */
+    private fun fillParentFromLast() {
+        if (parentDeviceInput.text.isNotEmpty()) return
+        parentDeviceInput.setText(config.lastParentDeviceId)
+    }
+
     /** 記録を未送信に入れた後の入力欄の初期化。二度押しで別IDの重複記録を作らせないため。 */
     private fun resetForm() {
         memoInput.setText("")
+        checkinRewardInput.setText("")
+        invitePointsInput.setText("")
+        endParentCheck.isChecked = false
+        // 親の端末IDは続けて同じ親を使うことが多いので残す（解除すると消える）
         hoursInput.setText("")
         selectService("")
         fillHoursFromUptime()
@@ -418,20 +439,25 @@ class ChallengePanel(
             setupStatusText.text = SCAN_UNAVAILABLE_MESSAGE
             return
         }
+        // 取得が終わらないまま案内が「準備しています」で止まらないよう、一定時間で差し替える。
+        // 差し替えたあとに取得が終われば、リスナーが「準備ができました」に変える
+        // もう一度押して取得を依頼し直したときは、前の待ち時間を数え直す
+        moduleWaitTimeout?.let { setupStatusText.removeCallbacks(it) }
+        val timeout = Runnable { applyModuleWait(SetupFill.ModuleWaitEvent.TIMED_OUT) }
+        moduleWaitTimeout = timeout
         val listener = object : InstallStatusListener {
             override fun onInstallStatusUpdated(update: ModuleInstallStatusUpdate) {
                 val state = update.installState
-                val completed = state == ModuleInstallStatusUpdate.InstallState.STATE_COMPLETED
-                val ended = completed ||
-                    state == ModuleInstallStatusUpdate.InstallState.STATE_FAILED ||
-                    state == ModuleInstallStatusUpdate.InstallState.STATE_CANCELED
-                if (!ended) return
+                val event = when (state) {
+                    ModuleInstallStatusUpdate.InstallState.STATE_COMPLETED -> SetupFill.ModuleWaitEvent.COMPLETED
+                    ModuleInstallStatusUpdate.InstallState.STATE_FAILED,
+                    ModuleInstallStatusUpdate.InstallState.STATE_CANCELED -> SetupFill.ModuleWaitEvent.FAILED
+                    else -> return
+                }
                 client.unregisterListener(this)
                 activity.runOnUiThread {
-                    // 準備中の案内が出たままのときだけ差し替える（その間の別の表示は消さない）
-                    if (setupStatusText.text.toString() == SCAN_PREPARING_MESSAGE) {
-                        setupStatusText.text = if (completed) SCAN_READY_MESSAGE else SCAN_UNAVAILABLE_MESSAGE
-                    }
+                    setupStatusText.removeCallbacks(timeout)
+                    applyModuleWait(event)
                 }
             }
         }
@@ -442,18 +468,35 @@ class ChallengePanel(
             return
         }
         setupStatusText.text = SCAN_PREPARING_MESSAGE
+        setupStatusText.postDelayed(timeout, SetupFill.MODULE_WAIT_TIMEOUT_MS)
         client.installModules(request)
             .addOnSuccessListener { response ->
                 if (response.areModulesAlreadyInstalled()) {
                     // モジュールはあるのに開けなかった。取得待ちではないので案内を変える
                     client.unregisterListener(listener)
+                    setupStatusText.removeCallbacks(timeout)
                     setupStatusText.text = SCAN_RETRY_MESSAGE
                 }
             }
             .addOnFailureListener {
                 client.unregisterListener(listener)
+                setupStatusText.removeCallbacks(timeout)
                 setupStatusText.text = SCAN_UNAVAILABLE_MESSAGE
             }
+    }
+
+    /** 取得待ちの案内を差し替える。取得待ちの案内が出ているときだけ変え、その間の別の表示は消さない。 */
+    private fun applyModuleWait(event: SetupFill.ModuleWaitEvent) {
+        val shown = when (setupStatusText.text.toString()) {
+            SCAN_PREPARING_MESSAGE -> SetupFill.ModuleWaitShown.PREPARING
+            SCAN_SLOW_MESSAGE -> SetupFill.ModuleWaitShown.SLOW
+            else -> SetupFill.ModuleWaitShown.OTHER
+        }
+        setupStatusText.text = when (SetupFill.moduleWaitNext(shown, event) ?: return) {
+            SetupFill.ModuleWaitNotice.SLOW -> SCAN_SLOW_MESSAGE
+            SetupFill.ModuleWaitNotice.READY -> SCAN_READY_MESSAGE
+            SetupFill.ModuleWaitNotice.UNAVAILABLE -> SCAN_UNAVAILABLE_MESSAGE
+        }
     }
 
     private fun clearClipboard(clipboard: ClipboardManager?) {
@@ -532,6 +575,7 @@ class ChallengePanel(
                     urlInput.setText("")
                     passwordInput.setText("")
                     deviceIdInput.setText("")
+                    parentDeviceInput.setText("")
                 }
                 if (done) render() else recordStatusText.text = BUSY_MESSAGE
             }
@@ -560,6 +604,35 @@ class ChallengePanel(
             recordStatusText.text = "メモは1000文字以内にしてください"
             return
         }
+        // 親の端末IDは必須（成功でも失敗でも）。空なら送らない
+        val parentId = parentDeviceInput.text.toString().trim()
+        if (parentId.isEmpty()) {
+            recordStatusText.text = "当てた親の端末IDを入力してください"
+            return
+        }
+        if (!ChallengeInput.isValidDeviceId(parentId)) {
+            recordStatusText.text = "親の端末IDは英数字・-・_ の40文字以内で入力してください"
+            return
+        }
+        // 任意の整数。空欄は未入力（null）、入っていて0以上の整数でなければエラー
+        val rewardText = checkinRewardInput.text.toString()
+        val checkinReward = if (rewardText.isBlank()) null else ChallengeInput.parseCount(rewardText)
+        if (rewardText.isNotBlank() && checkinReward == null) {
+            recordStatusText.text = "チェックイン報酬は0以上の整数（円）で入力してください"
+            return
+        }
+        // 親の即時ポイントは成功のときだけ読む。失敗では入力があっても送らない
+        var invitePoints: Int? = null
+        if (result == ChallengeRecord.RESULT_SUCCESS) {
+            val pointsText = invitePointsInput.text.toString()
+            if (pointsText.isNotBlank()) {
+                invitePoints = ChallengeInput.parseCount(pointsText)
+                if (invitePoints == null) {
+                    recordStatusText.text = "親の即時ポイントは0以上の整数で入力してください"
+                    return
+                }
+            }
+        }
         // F16: この機能より前に紐づけた端末。記録は作らず、入力はそのまま残して紐づけし直してもらう
         if (config.accountId.isEmpty()) {
             recordStatusText.text = "アカウントを選んで紐づけし直してください"
@@ -574,7 +647,12 @@ class ChallengePanel(
             return
         }
         // 実施日時はここで固定する。通信が遅れても動かさない。
-        val record = ChallengeRecord.create(config.deviceId, config.accountId, hours, result, service, memo)
+        val record = ChallengeRecord.create(
+            config.deviceId, config.accountId, hours, result, service, memo,
+            parentDeviceId = parentId, checkinReward = checkinReward, invitePoints = invitePoints,
+            endParent = endParentCheck.isChecked
+        )
+        config.saveLastParentDeviceId(parentId)
         // 送信前に必ず保存する。ここで落ちても記録は消えない。
         // 端末の空きがなくて保存できなくても送信は試みる（送れれば記録は残る）。
         val saved = try {
@@ -637,6 +715,79 @@ class ChallengePanel(
         }
     }
 
+    // ---- 親の終了（単独） ----
+
+    /** 理由を選んでもらい、確認のうえで親の終了を未送信キューに入れて送る。 */
+    private fun confirmEndParent() {
+        if (inFlight.get()) {
+            recordStatusText.text = BUSY_MESSAGE
+            return
+        }
+        val reasons = listOf(ChallengeRecord.REASON_RESET, ChallengeRecord.REASON_GIVE_UP)
+        val labels = arrayOf("初期化した（reset）", "失敗して親として続けない（giveUp）")
+        var chosen = 0
+        AlertDialog.Builder(activity)
+            .setTitle("この端末の親を終了しますか？")
+            .setSingleChoiceItems(labels, chosen) { _, which -> chosen = which }
+            .setPositiveButton("終了する") { _, _ -> submitEndParent(reasons[chosen]) }
+            .setNegativeButton("やめる", null)
+            .show()
+    }
+
+    /** 親の終了を保存してから送る。流れは record() と同じ（保存→送信→成功で消す。同じ id で再送）。 */
+    private fun submitEndParent(reason: String) {
+        // ダイアログを開いてから押すまでに送信が始まっていたら重ねない
+        if (!inFlight.compareAndSet(false, true)) {
+            recordStatusText.text = BUSY_MESSAGE
+            return
+        }
+        val record = ChallengeRecord.createEndParent(config.deviceId, reason)
+        val saved = try {
+            pending.add(record)
+            true
+        } catch (_: IOException) {
+            false
+        }
+        renderPending()
+        val url = config.apiUrl
+        val password = config.password
+
+        setRecordButtonsEnabled(false)
+        recordStatusText.text = if (saved) "親の終了を送信中..." else "親の終了を送信中...（$NOT_SAVED_MESSAGE）"
+        runInBackground(onError = {
+            setRecordButtonsEnabled(true)
+            recordStatusText.text =
+                if (saved) "送信中にエラーが起きました。未送信に保存済みで、自動で送り直します"
+                else "送信中にエラーが起きました（$NOT_SAVED_MESSAGE）"
+            renderPending()
+        }) {
+            val response = ChallengeApi.send(url, password, record)
+            if (saved) {
+                try {
+                    if (response.ok) {
+                        pending.remove(record.id)
+                    } else if (PendingRecords.needsAttention(response.code)) {
+                        pending.markAttention(record.id, describe(response, record))
+                    }
+                } catch (_: IOException) {
+                    // 次回の再送でサーバー側の重複判定に任せる
+                }
+            }
+            val ui: () -> Unit = {
+                setRecordButtonsEnabled(true)
+                recordStatusText.text = when {
+                    response.ok -> if (response.duplicate) "親の終了は記録済みでした（重複なし）" else "親を終了しました"
+                    !saved -> "送信できませんでした（${describe(response, record)}）。$NOT_SAVED_MESSAGE"
+                    PendingRecords.needsAttention(response.code) ->
+                        "${describe(response, record)}（未送信に残しました）"
+                    else -> "未送信として保存しました（${describe(response)}）。自動で送り直すので、もう一度押す必要はありません"
+                }
+                renderPending()
+            }
+            ui
+        }
+    }
+
     /**
      * 通信を背景スレッドで行い、結果の反映をUIスレッドへ渡す。
      * work は背景スレッドで動き、UIスレッドで実行する処理を返す。
@@ -659,6 +810,7 @@ class ChallengePanel(
     private fun setRecordButtonsEnabled(enabled: Boolean) {
         recordSuccessButton.isEnabled = enabled
         recordFailureButton.isEnabled = enabled
+        endParentButton.isEnabled = enabled
     }
 
     /** [record] は使い切りの文言にアカウントIDとサービスを入れるため（未送信一覧の行の見分けにも使う）。 */
@@ -688,7 +840,7 @@ class ChallengePanel(
             }
             row.addView(TextView(activity).apply {
                 val mark = if (r.status == ChallengeRecord.STATUS_ATTENTION) "※要確認 " else ""
-                text = "$mark${r.result} / ${r.service} / ${ChallengeInput.formatHours(r.hours)}h"
+                text = "$mark${ChallengeInput.summary(r)}"
                 setTextColor(
                     if (r.status == ChallengeRecord.STATUS_ATTENTION)
                         activity.resources.getColor(R.color.pixel_accent, null)
@@ -867,7 +1019,7 @@ class ChallengePanel(
             return
         }
         AlertDialog.Builder(activity)
-            .setMessage("この未送信の記録を破棄しますか？\n${record.at}\n${record.result} / ${record.service}")
+            .setMessage("この未送信の記録を破棄しますか？\n${record.at}\n${ChallengeInput.summary(record)}")
             .setPositiveButton("破棄") { _, _ ->
                 // ダイアログを開いてから押すまでに自動再送が始まっていたら、破棄した記録が
                 // 届いてしまう。確定の時点でも送信中フラグを取り、取れなければ破棄しない。
@@ -900,6 +1052,8 @@ class ChallengePanel(
         private const val QUEUE_UPDATE_FAILED = "端末の空きがなく未送信の一覧を更新できませんでした"
         private const val SCAN_PREPARING_MESSAGE =
             "読み取り機能を準備しています。少し待ってからもう一度押してください"
+        private const val SCAN_SLOW_MESSAGE =
+            "読み取り機能の準備に時間がかかっています。通信できる場所で少し待ってからもう一度押すか、「クリップボードから読み込む」を使ってください"
         private const val SCAN_READY_MESSAGE =
             "読み取りの準備ができました。もう一度「QRを読み取る」を押してください"
         private const val SCAN_RETRY_MESSAGE =

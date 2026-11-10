@@ -7,11 +7,37 @@ plugins {
 
 // リリース署名鍵の設定。keystore.properties は gitignore してあるので、
 // 手元に無い環境（CI や clone 直後）では署名なしのまま assembleDebug だけ通る。
-val keystorePropsFile = rootProject.file("keystore.properties")
-val keystoreProps = Properties().apply {
-    if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
+// 設定ファイルの探し方（上が優先）:
+//   1. 環境変数 KEYSTORE_PROPERTIES … properties ファイル自体のパス
+//   2. 環境変数 STORAGE_FILLER_KEYSTORE_DIR … その中の keystore.properties
+//   3. リポジトリ直下の keystore.properties（従来どおり。Windows 側はこれ）
+// 環境変数で指した場合、storeFile が相対パスなら properties のあるフォルダ基準で解釈する。
+val envPropsPath = System.getenv("KEYSTORE_PROPERTIES")?.takeIf { it.isNotBlank() }
+val envDirPath = System.getenv("STORAGE_FILLER_KEYSTORE_DIR")?.takeIf { it.isNotBlank() }
+val fromEnv = envPropsPath != null || envDirPath != null
+val keystorePropsFile: File = when {
+    envPropsPath != null -> File(envPropsPath)
+    envDirPath != null -> File(envDirPath, "keystore.properties")
+    else -> rootProject.file("keystore.properties")
 }
-val hasReleaseKey = keystoreProps.getProperty("storeFile")?.let { file(it).exists() } == true
+val keystoreProps = Properties().apply {
+    // 読めない・壊れているときは空のまま（鍵なし扱い）
+    runCatching { if (keystorePropsFile.isFile) keystorePropsFile.inputStream().use { load(it) } }
+}
+// 鍵ファイルの場所。解釈できない書き方（Linux から見た Windows の C:/... など）なら null
+val releaseStoreFile: File? = keystoreProps.getProperty("storeFile")?.takeIf { it.isNotBlank() }?.let { path ->
+    runCatching {
+        val f = File(path)
+        when {
+            f.isAbsolute -> f
+            fromEnv -> File(keystorePropsFile.absoluteFile.parentFile, path)
+            else -> file(path)
+        }.takeIf { it.isFile }
+    }.getOrNull()
+}
+// 鍵ファイルがあり、パスワード・別名も揃っているときだけ署名する。それ以外は鍵なし扱い
+val hasReleaseKey = releaseStoreFile != null &&
+    listOf("storePassword", "keyAlias", "keyPassword").all { !keystoreProps.getProperty(it).isNullOrEmpty() }
 
 android {
     namespace = "jp.own.storagefiller"
@@ -21,8 +47,8 @@ android {
         applicationId = "jp.own.storagefiller"
         minSdk = 24
         targetSdk = 35
-        versionCode = 16
-        versionName = "0.10.2"
+        versionCode = 17
+        versionName = "0.11.0"
 
         // アプリ内アップデートの取得元。リポジトリを移す場合はここだけ変える
         buildConfigField("String", "UPDATE_REPO", "\"miominase/storage-filler\"")
@@ -31,7 +57,7 @@ android {
     if (hasReleaseKey) {
         signingConfigs {
             create("release") {
-                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storeFile = releaseStoreFile
                 storePassword = keystoreProps.getProperty("storePassword")
                 keyAlias = keystoreProps.getProperty("keyAlias")
                 keyPassword = keystoreProps.getProperty("keyPassword")
@@ -80,6 +106,22 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+}
+
+// 鍵なしで正式版（release）をAPK/AABまで作ろうとしたら、署名なしの成果物を出さずに失敗させる。
+// debug・単体テスト・r8test には影響しない。
+gradle.taskGraph.whenReady {
+    val releaseOutputs = setOf("packageRelease", "bundleRelease", "assembleRelease")
+    if (!hasReleaseKey && allTasks.any { it.project == project && it.name in releaseOutputs }) {
+        throw GradleException(
+            "正式版(release)の署名鍵が見つからない、または解釈できないため中止します（署名なしAPKは作りません）。" +
+                " 探した場所: ${keystorePropsFile.path}" +
+                "（存在=${keystorePropsFile.isFile}）。" +
+                " 環境変数 KEYSTORE_PROPERTIES か STORAGE_FILLER_KEYSTORE_DIR で keystore.properties を指し、" +
+                " storeFile・storePassword・keyAlias・keyPassword が揃い、鍵ファイルがこのPCから読めることを確認してください。" +
+                " 手順は KNOWLEDGE.md の「正式ビルドの署名設定」。"
+        )
     }
 }
 

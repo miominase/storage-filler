@@ -72,4 +72,52 @@ public class ChallengeRecordTest {
         assertEquals("user0001", r.getAccountId());
         assertEquals(true, r.getOverUse());
     }
+
+    @Test
+    public void fromJson_oldQueueEntryBecomesAPlainRecord() throws Exception {
+        // 親の項目が入る前に保存された未送信（キーなし）も読める
+        JSONObject old = sample().toJson();
+        for (String k : new String[]{"kind", "parentDeviceId", "checkinReward", "invitePoints", "endParent", "endReason"}) {
+            old.remove(k);
+        }
+        ChallengeRecord r = ChallengeRecord.Companion.fromJson(old);
+        assertEquals(ChallengeRecord.KIND_RECORD, r.getKind());
+        assertEquals("", r.getParentDeviceId());
+        assertEquals(null, r.getCheckinReward());
+        assertEquals(null, r.getInvitePoints());
+        assertEquals(false, r.getEndParent());
+        assertEquals(false, r.isEndParent());
+    }
+
+    @Test
+    public void toJson_roundTripsParentFields() throws Exception {
+        ChallengeRecord before = ChallengeRecord.Companion.create(
+                "001", "user0001", 1.0, "成功", "LINE", "", "42", 0, 7, true);
+        ChallengeRecord after = ChallengeRecord.Companion.fromJson(before.toJson());
+        assertEquals("42", after.getParentDeviceId());
+        assertEquals(Integer.valueOf(0), after.getCheckinReward());
+        assertEquals(Integer.valueOf(7), after.getInvitePoints());
+        assertEquals(true, after.getEndParent());
+    }
+
+    @Test
+    public void create_dropsInvitePointsForFailure() {
+        ChallengeRecord r = ChallengeRecord.Companion.create(
+                "001", "user0001", 1.0, "失敗", "LINE", "", "42", 10, 7, true);
+        assertEquals(null, r.getInvitePoints());
+        assertEquals(Integer.valueOf(10), r.getCheckinReward());
+        assertEquals(true, r.getEndParent());
+    }
+
+    @Test
+    public void createEndParent_roundTripsAndIsSeparateKind() throws Exception {
+        ChallengeRecord e = ChallengeRecord.Companion.createEndParent("37", ChallengeRecord.REASON_RESET);
+        assertTrue(e.getId(), e.getId().matches("[a-zA-Z0-9-]{16,80}"));
+        assertTrue(e.isEndParent());
+        ChallengeRecord back = ChallengeRecord.Companion.fromJson(e.toJson());
+        assertEquals(ChallengeRecord.KIND_END_PARENT, back.getKind());
+        assertEquals("reset", back.getEndReason());
+        assertEquals(e.getAt(), back.getAt());
+        assertEquals("37", back.getDeviceId());
+    }
 }
