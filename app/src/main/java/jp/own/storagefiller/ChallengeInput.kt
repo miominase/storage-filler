@@ -40,6 +40,7 @@ object ChallengeInput {
 
     /** 未送信一覧・破棄確認で見せる1行の要約。 */
     fun summary(r: ChallengeRecord): String {
+        if (r.isLink) return "共有リンク / ${r.sharedUrl.take(60)}"
         if (r.isEndParent) {
             val why = when (r.endReason) {
                 ChallengeRecord.REASON_RESET -> "初期化"

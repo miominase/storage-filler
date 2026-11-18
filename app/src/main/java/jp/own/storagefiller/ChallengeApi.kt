@@ -17,7 +17,7 @@ object ChallengeApi {
     /** 応答がJSONとして読めなかった（ログイン画面のHTML、使い切りの echo URL を2回読んだときの「Not available」など）。 */
     const val UNREADABLE = "UNREADABLE"
 
-    data class Result(
+    data class Result @JvmOverloads constructor(
         val ok: Boolean,
         val code: String = "",
         val message: String = "",
@@ -25,7 +25,9 @@ object ChallengeApi {
         val duplicate: Boolean = false,
         val accountId: String = "",
         val lineLeft: Int? = null,
-        val googleLeft: Int? = null
+        val googleLeft: Int? = null,
+        /** addLink で、同じURLが既にシートにあって行を足さなかった。 */
+        val sameUrl: Boolean = false
     )
 
     fun verify(url: String, password: String, deviceId: String, accountId: String): Result =
@@ -52,7 +54,30 @@ object ChallengeApi {
 
     /** 未送信キューの1件を送る。種別で本文を切り替える（再送でも同じ id のまま）。 */
     fun send(url: String, password: String, record: ChallengeRecord): Result =
-        post(url, if (record.isEndParent) endParentBody(password, record) else recordBody(password, record))
+        post(
+            url,
+            when {
+                record.isEndParent -> endParentBody(password, record)
+                record.isLink -> linkBody(password, record)
+                else -> recordBody(password, record)
+            }
+        )
+
+    /**
+     * 共有リンク（action=addLink）の本文。トップレベルに置く（endParent と同じ）。id は再送でも同じ。
+     * サーバー（記録API）側に addLink が無いうちは「不明な操作」で断られ、未送信に残る。
+     */
+    fun linkBody(password: String, record: ChallengeRecord): JSONObject {
+        val body = JSONObject()
+            .put("action", "addLink")
+            .put("password", password)
+            .put("id", record.id)
+            .put("deviceId", record.deviceId)
+            .put("at", record.at)
+            .put("url", record.sharedUrl)
+        if (record.sharedText.isNotEmpty()) body.put("text", record.sharedText)
+        return body
+    }
 
     /**
      * 単独の親の終了（action=endParent）の本文。id は再送でも同じ。endedAt は記録を作った時刻。
@@ -148,6 +173,7 @@ object ChallengeApi {
                 ok = true,
                 deviceName = o.optString("deviceName"),
                 duplicate = o.optBoolean("duplicate"),
+                sameUrl = o.optBoolean("sameUrl"),
                 accountId = accountId, lineLeft = lineLeft, googleLeft = googleLeft
             )
         } else {

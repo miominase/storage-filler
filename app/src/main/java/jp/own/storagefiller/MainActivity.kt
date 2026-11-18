@@ -221,6 +221,18 @@ class MainActivity : Activity(), FillEngine.Listener {
      * 再度適用されないようにする。
      */
     private fun handleIncomingIntent() {
+        // 共有メニュー（テキスト）。URL を確認ダイアログに出すだけで、自動では開かない。
+        // 回転・復帰での二重処理を避けるため、取り出したら action と extra を消す。
+        if (intent.action == Intent.ACTION_SEND && intent.type?.startsWith("text/plain") == true) {
+            val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+            val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+            intent.action = null
+            intent.removeExtra(Intent.EXTRA_TEXT)
+            intent.removeExtra(Intent.EXTRA_SUBJECT)
+            showPanel(true)
+            challengePanelController.receiveShared(text, subject)
+            return
+        }
         val uri = intent.data ?: return
         // 判定と取り出しはクリップボード・QR読み取りと同じ SetupLink に任せる
         val (url, password) = SetupLink.fromUri(uri) ?: return

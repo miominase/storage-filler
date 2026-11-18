@@ -37,7 +37,11 @@ data class ChallengeRecord @JvmOverloads constructor(
     /** true なら、この記録のあと自端末の親を終了する。 */
     val endParent: Boolean = false,
     /** [KIND_END_PARENT] の理由（[REASON_RESET] / [REASON_GIVE_UP]）。それ以外の種別では空。 */
-    val endReason: String = ""
+    val endReason: String = "",
+    /** [KIND_LINK] の共有されたURL。それ以外の種別では空。文字列として保存するだけ。 */
+    val sharedUrl: String = "",
+    /** [KIND_LINK] の共有元テキスト（URLを含む全文）。 */
+    val sharedText: String = ""
 ) {
     /** 保存用の形（端末内のキュー）。APIへ送る形は ChallengeApi.recordBody / endParentBody。 */
     fun toJson(): JSONObject {
@@ -57,6 +61,8 @@ data class ChallengeRecord @JvmOverloads constructor(
             .put("parentDeviceId", parentDeviceId)
             .put("endParent", endParent)
             .put("endReason", endReason)
+            .put("sharedUrl", sharedUrl)
+            .put("sharedText", sharedText)
         // null は「未入力」。0 と区別するためキーごと省く
         if (checkinReward != null) o.put("checkinReward", checkinReward)
         if (invitePoints != null) o.put("invitePoints", invitePoints)
@@ -65,12 +71,17 @@ data class ChallengeRecord @JvmOverloads constructor(
 
     val isEndParent: Boolean get() = kind == KIND_END_PARENT
 
+    val isLink: Boolean get() = kind == KIND_LINK
+
     companion object {
         const val STATUS_PENDING = "pending"
         const val STATUS_ATTENTION = "attention"
 
         const val KIND_RECORD = "record"
         const val KIND_END_PARENT = "endParent"
+
+        /** 共有メニューから受けたリンク（専用タブへ1件1行）。 */
+        const val KIND_LINK = "link"
 
         const val REASON_RESET = "reset"
         const val REASON_GIVE_UP = "giveUp"
@@ -96,7 +107,9 @@ data class ChallengeRecord @JvmOverloads constructor(
             checkinReward = if (o.has("checkinReward") && !o.isNull("checkinReward")) o.optInt("checkinReward") else null,
             invitePoints = if (o.has("invitePoints") && !o.isNull("invitePoints")) o.optInt("invitePoints") else null,
             endParent = o.optBoolean("endParent", false),
-            endReason = o.optString("endReason")
+            endReason = o.optString("endReason"),
+            sharedUrl = o.optString("sharedUrl"),
+            sharedText = o.optString("sharedText")
         )
 
         /** minSdk 24 では java.time が使えないため SimpleDateFormat を使う。 */
@@ -135,6 +148,22 @@ data class ChallengeRecord @JvmOverloads constructor(
             // 即時ポイントは成功のときだけ送る（失敗では入力があっても捨てる）
             invitePoints = if (result == RESULT_SUCCESS) invitePoints else null,
             endParent = endParent
+        )
+
+        /** 共有されたリンク。`at` は共有を受けて「送る」を押した時刻で固定し、再送でも同じ id・同じ内容で送る。 */
+        fun createLink(deviceId: String, url: String, text: String): ChallengeRecord = ChallengeRecord(
+            id = UUID.randomUUID().toString(),
+            at = isoNow(System.currentTimeMillis()),
+            deviceId = deviceId,
+            hours = 0.0,
+            result = "",
+            service = "",
+            memo = "",
+            status = STATUS_PENDING,
+            lastError = "",
+            kind = KIND_LINK,
+            sharedUrl = url,
+            sharedText = text
         )
 
         /** 単独の親の終了。`at` を endedAt として使う。再送でも同じ id・同じ時刻で送る。 */

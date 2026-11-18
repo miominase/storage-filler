@@ -46,6 +46,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 共有メニューからテキスト（URL）を受ける。確認ダイアログを経て記録APIの専用タブへ送る。
+                 URL は文字列として扱うだけで、開かない・取得しない。 -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
             <!-- QRコード経由の初回設定。端末の標準カメラがこのスキームをデコードして開く。
                  autoVerifyは付けない（App Linksのドメイン検証はカスタムスキームには不要）。 -->
             <intent-filter>

@@ -715,6 +715,89 @@ class ChallengePanel(
         }
     }
 
+    // ---- 共有リンク（共有メニューから受ける） ----
+
+    /**
+     * 共有メニューで受け取った文字列を確認ダイアログに出す。URL は文字列として見せるだけで、開かない・取得しない
+     * （AlertDialog の message はリンク化されない）。「送る」で未送信キューに入れて送る。
+     */
+    fun receiveShared(text: String?, subject: String?) {
+        val parsed = SharedLink.parse(text, subject)
+        if (parsed == null) {
+            recordStatusText.text = "共有された内容にURL（http/https）が見つかりませんでした"
+            return
+        }
+        if (!config.isBound()) {
+            recordStatusText.text = "先に端末を紐づけてから、もう一度共有してください"
+            return
+        }
+        val already = pending.all().any { it.isLink && it.sharedUrl == parsed.url }
+        val note = if (already) "\n\n※同じURLが未送信に残っています（シートに既にあれば足しません）" else ""
+        AlertDialog.Builder(activity)
+            .setTitle("このリンクをスプレッドシートに送りますか？")
+            .setMessage("${parsed.url}\n\n共有元:\n${parsed.text}$note")
+            .setPositiveButton("送る") { _, _ -> submitLink(parsed) }
+            .setNegativeButton("やめる", null)
+            .show()
+    }
+
+    /** 流れは record() と同じ（保存→送信→成功で消す。同じ id で再送）。 */
+    private fun submitLink(parsed: SharedLink.Parsed) {
+        if (!inFlight.compareAndSet(false, true)) {
+            recordStatusText.text = BUSY_MESSAGE
+            return
+        }
+        val record = ChallengeRecord.createLink(config.deviceId, parsed.url, parsed.text)
+        val saved = try {
+            pending.add(record)
+            true
+        } catch (_: IOException) {
+            false
+        }
+        renderPending()
+        val url = config.apiUrl
+        val password = config.password
+
+        setRecordButtonsEnabled(false)
+        recordStatusText.text = if (saved) "リンクを送信中..." else "リンクを送信中...（$NOT_SAVED_MESSAGE）"
+        runInBackground(onError = {
+            setRecordButtonsEnabled(true)
+            recordStatusText.text =
+                if (saved) "送信中にエラーが起きました。未送信に保存済みです（再送ボタンで送り直せます）"
+                else "送信中にエラーが起きました（$NOT_SAVED_MESSAGE）"
+            renderPending()
+        }) {
+            val response = ChallengeApi.send(url, password, record)
+            if (saved) {
+                try {
+                    if (response.ok) {
+                        pending.remove(record.id)
+                    } else if (PendingRecords.needsAttention(response.code)) {
+                        pending.markAttention(record.id, describe(response, record))
+                    }
+                } catch (_: IOException) {
+                    // 次回の再送でサーバー側の重複判定（id）に任せる
+                }
+            }
+            val ui: () -> Unit = {
+                setRecordButtonsEnabled(true)
+                recordStatusText.text = when {
+                    response.ok -> when {
+                        response.sameUrl -> "このURLは前に送っています（シートには足していません）"
+                        response.duplicate -> "送信済みのリンクでした（重複なし）"
+                        else -> "リンクを送りました"
+                    }
+                    !saved -> "送信できませんでした（${describe(response, record)}）。$NOT_SAVED_MESSAGE"
+                    PendingRecords.needsAttention(response.code) ->
+                        "${describe(response, record)}（未送信に残しました）"
+                    else -> "未送信として保存しました（${describe(response)}）。未送信一覧の再送で送り直せます"
+                }
+                renderPending()
+            }
+            ui
+        }
+    }
+
     // ---- 親の終了（単独） ----
 
     /** 理由を選んでもらい、確認のうえで親の終了を未送信キューに入れて送る。 */
