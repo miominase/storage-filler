@@ -37,6 +37,18 @@
         <!-- 回転・ダークモード切替・外付けキーボードで作り直さない。横向き用・夜間用のリソースは
              無いので並び直しだけで足りる。
              作り直すと、表示中のパネル・案内文・スキャン中の読み取り結果が失われる。 -->
+        <!-- TikTok 端末管理に端末番号だけを渡す（呼び手は DeviceIdActivity の中で確かめる）。 -->
+        <activity
+            android:name=".DeviceIdActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="jp.own.storagefiller.action.DEVICE_ID" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|uiMode"

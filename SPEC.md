@@ -272,6 +272,15 @@
 
 **保存形式の互換**：未送信キューの各件に `sharedUrl` / `sharedText` を足した。キーが無い古い保存分は通常の記録として読む。
 
+### F19. 端末番号を TikTok 端末管理に渡す（v0.13.0〜）
+
+きっかけ：TikTok 端末管理のアプリ（`jp.own.tiktokdevice`）の「かんたん連携」で、この端末に設定した端末番号を手で打たずに使えるようにする。
+
+- 画面のない `DeviceIdActivity` を足す。action は `jp.own.storagefiller.action.DEVICE_ID`（category は DEFAULT）。
+- 呼び手が `startActivityForResult` で呼んだ `jp.own.tiktokdevice` のときだけ、`RESULT_OK` と extra `device_id`（端末番号）を返す。呼び手が違う・action が違う・端末番号が未設定または形が違う（F14 の端末番号と同じ判定）ときは `RESULT_CANCELED`。
+- 渡すのは端末番号だけ。記録先のURL・パスワード・Googleアカウントは渡さない。
+- 判定は `DeviceIdShare.answer` に分け、単体テストで確かめる。
+
 ## 非機能要件
 
 - minSdk 24（Android 7.0）/ targetSdk 35 / compileSdk 35
